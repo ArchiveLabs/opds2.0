@@ -15,14 +15,22 @@ from opds2.models import (
     Publication,
 )
 from opds2.provider import DataProvider
+from opds2.types import (
+    ItemMapping,
+    OPDS_RESERVED_FIELDS,
+    SearchResult,
+)
 
 __all__ = [
     "Catalog",
     "Contributor",
     "DataProvider",
+    "ItemMapping",
     "Link",
     "Metadata",
+    "OPDS_RESERVED_FIELDS",
     "Publication",
+    "SearchResult",
     "create_catalog",
     "create_search_catalog",
 ]

@@ -2,15 +2,12 @@
 
 import json
 from datetime import datetime, timezone
-from typing import List
 
 from opds2 import (
     Catalog,
-    Contributor,
     DataProvider,
-    Link,
-    Metadata,
-    Publication,
+    ItemMapping,
+    SearchResult,
     create_catalog,
     create_search_catalog,
 )
@@ -24,9 +21,7 @@ class TestIntegration:
 
         # Step 1: Create a DataProvider implementation
         class SimpleProvider(DataProvider):
-            def search(
-                self, query: str, limit: int = 50, offset: int = 0
-            ) -> List[Publication]:
+            def search(self, query: str, page: int = 1, rows: int = 50) -> SearchResult:
                 books = [
                     {
                         "title": "Test Book 1",
@@ -40,23 +35,29 @@ class TestIntegration:
                     },
                 ]
 
-                results = []
-                for book in books:
-                    if not query or query.lower() in book["title"].lower():
-                        metadata = Metadata(
-                            title=book["title"],
-                            author=[Contributor(name=book["author"], role="author")],
-                        )
-                        links = [
-                            Link(
-                                href=book["url"],
-                                type="application/epub+zip",
-                                rel="http://opds-spec.org/acquisition",
-                            )
-                        ]
-                        results.append(Publication(metadata=metadata, links=links))
-
-                return results[offset : offset + limit]
+                # Filter and paginate
+                filtered = [
+                    book for book in books
+                    if not query or query.lower() in book["title"].lower()
+                ]
+                
+                offset = (page - 1) * rows
+                paginated = filtered[offset:offset + rows]
+                
+                return SearchResult(
+                    items=paginated,
+                    page=page,
+                    num_found=len(filtered),
+                    rows=rows
+                )
+            
+            def get_item_mapping(self) -> ItemMapping:
+                return ItemMapping(
+                    title=lambda item: item.get("title"),
+                    author=lambda item: [item.get("author")] if item.get("author") else [],
+                    acquisition_link=lambda item: item.get("url"),
+                    acquisition_type=lambda item: "application/epub+zip",
+                )
 
         provider = SimpleProvider()
 
@@ -86,7 +87,7 @@ class TestIntegration:
         search_results = create_search_catalog(
             provider=provider,
             query="Book 1",
-            limit=10,
+            rows=10,
             self_link="https://example.com/search?q=Book+1",
         )
 
@@ -143,6 +144,8 @@ class TestIntegration:
 
     def test_catalog_with_publications_directly(self):
         """Test creating a catalog with publications directly (not via search)."""
+        from opds2.models import Publication, Metadata, Contributor, Link
+        
         # Create publications manually
         pub1 = Publication(
             metadata=Metadata(
@@ -222,3 +225,39 @@ class TestIntegration:
         assert data["metadata"]["modified"] is not None
         # Verify it's a string representation
         assert isinstance(data["metadata"]["modified"], str)
+    
+    def test_search_result_and_mapping(self):
+        """Test SearchResult and ItemMapping directly."""
+        # Create a provider with specific mapping
+        class TestProvider(DataProvider):
+            def search(self, query: str, page: int = 1, rows: int = 50) -> SearchResult:
+                items = [
+                    {"title": "Book A", "author_name": "Author A", "cover_id": 123},
+                    {"title": "Book B", "author_name": "Author B", "cover_id": 456},
+                ]
+                return SearchResult(items=items, page=page, num_found=2, rows=rows)
+            
+            def get_item_mapping(self) -> ItemMapping:
+                return ItemMapping(
+                    title=lambda item: item.get("title"),
+                    author=lambda item: [item.get("author_name")] if item.get("author_name") else [],
+                    cover_url=lambda item: f"https://example.com/cover/{item['cover_id']}.jpg" 
+                        if item.get("cover_id") else None,
+                )
+        
+        provider = TestProvider()
+        
+        # Test search result
+        result = provider.search("test")
+        assert result.num_found == 2
+        assert result.page == 1
+        assert result.rows == 50
+        assert len(result.items) == 2
+        
+        # Test mapping
+        mapping = provider.get_item_mapping()
+        mapped = mapping.map_item(result.items[0])
+        assert mapped["title"] == "Book A"
+        assert mapped["author"] == ["Author A"]
+        assert "cover_url" in mapped
+        assert "123.jpg" in mapped["cover_url"]

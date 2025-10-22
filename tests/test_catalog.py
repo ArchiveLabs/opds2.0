@@ -2,13 +2,13 @@
 
 import json
 from datetime import datetime
-from typing import List
 
 import pytest
 
 from opds2.catalog import create_catalog, create_search_catalog
 from opds2.models import Contributor, Link, Metadata, Publication
 from opds2.provider import DataProvider
+from opds2.types import ItemMapping, SearchResult
 
 
 class MockDataProvider(DataProvider):
@@ -36,57 +36,63 @@ class MockDataProvider(DataProvider):
             },
         ]
     
-    def search(self, query: str, limit: int = 50, offset: int = 0) -> List[Publication]:
+    def search(self, query: str, page: int = 1, rows: int = 50) -> SearchResult:
         """Search mock books."""
         # Simple case-insensitive search
         query_lower = query.lower()
         results = [
             book for book in self.books
-            if query_lower in book["title"].lower() or query_lower in book["author"].lower()
+            if not query or query_lower in book["title"].lower() or query_lower in book["author"].lower()
         ]
         
         # Apply pagination
-        results = results[offset:offset + limit]
+        offset = (page - 1) * rows
+        paginated = results[offset:offset + rows]
         
-        # Convert to Publication objects
-        publications = []
-        for book in results:
-            metadata = Metadata(
-                title=book["title"],
-                author=[Contributor(name=book["author"], role="author")],
-                language=[book["language"]]
-            )
-            links = [
-                Link(href=book["url"], type="application/epub+zip", rel="http://opds-spec.org/acquisition")
-            ]
-            publications.append(Publication(metadata=metadata, links=links))
-        
-        return publications
+        return SearchResult(
+            items=paginated,
+            page=page,
+            num_found=len(results),
+            rows=rows
+        )
+    
+    def get_item_mapping(self) -> ItemMapping:
+        """Get item mapping for mock books."""
+        return ItemMapping(
+            title=lambda item: item.get("title"),
+            author=lambda item: [item.get("author")] if item.get("author") else [],
+            language=lambda item: [item.get("language")] if item.get("language") else None,
+            acquisition_link=lambda item: item.get("url"),
+            acquisition_type=lambda item: "application/epub+zip",
+        )
 
 
 def test_data_provider_search():
     """Test DataProvider search functionality."""
     provider = MockDataProvider()
-    results = provider.search("gatsby")
+    result = provider.search("gatsby")
     
-    assert len(results) == 1
-    assert results[0].metadata.title == "The Great Gatsby"
+    assert result.num_found == 1
+    assert len(result.items) == 1
+    assert result.items[0]["title"] == "The Great Gatsby"
 
 
 def test_data_provider_search_multiple_results():
     """Test DataProvider search with multiple results."""
     provider = MockDataProvider()
-    results = provider.search("the")
+    result = provider.search("the")
     
-    assert len(results) == 1  # "The Great Gatsby" (only title matches "the")
+    assert result.num_found == 1  # "The Great Gatsby" (only title matches "the")
+    assert len(result.items) == 1
 
 
 def test_data_provider_search_no_results():
     """Test DataProvider search with no results."""
     provider = MockDataProvider()
-    results = provider.search("xyz123")
+    result = provider.search("xyz123")
     
-    assert len(results) == 0
+    assert result.num_found == 0
+    assert len(result.items) == 0
 
 
 def test_data_provider_search_pagination():
@@ -95,16 +101,18 @@ def test_data_provider_search_pagination():
     
     # Get all results
     all_results = provider.search("")
-    assert len(all_results) == 3
+    assert all_results.num_found == 3
+    assert len(all_results.items) == 3
     
     # Get first result with limit
-    results = provider.search("", limit=1)
-    assert len(results) == 1
+    results = provider.search("", rows=1)
+    assert len(results.items) == 1
+    assert results.num_found == 3  # Total found is still 3
     
-    # Get second result with offset
-    results = provider.search("", limit=1, offset=1)
-    assert len(results) == 1
-    assert results[0].metadata.title == "To Kill a Mockingbird"
+    # Get second result with page
+    results = provider.search("", page=2, rows=1)
+    assert len(results.items) == 1
+    assert results.items[0]["title"] == "To Kill a Mockingbird"
 
 
 def test_create_catalog_basic():
@@ -223,3 +231,25 @@ def test_catalog_integration():
     
     assert len(search_data["publications"]) == 1
     assert search_data["publications"][0]["metadata"]["title"] == "The Great Gatsby"
+
+
+def test_item_mapping():
+    """Test ItemMapping functionality."""
+    provider = MockDataProvider()
+    mapping = provider.get_item_mapping()
+    
+    # Test mapping a single item
+    test_item = {
+        "title": "Test Book",
+        "author": "Test Author",
+        "language": "en",
+        "url": "https://example.com/test.epub"
+    }
+    
+    mapped = mapping.map_item(test_item)
+    
+    assert mapped["title"] == "Test Book"
+    assert mapped["author"] == ["Test Author"]
+    assert mapped["language"] == ["en"]
+    assert mapped["acquisition_link"] == "https://example.com/test.epub"
+    assert mapped["acquisition_type"] == "application/epub+zip"
