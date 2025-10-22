@@ -9,6 +9,7 @@ Based on the [OPDS 2.0 specification](https://drafts.opds.io/opds-2.0).
 - 🎯 **Type-safe**: Built with Pydantic for robust type checking and validation
 - 📚 **OPDS 2.0 Compliant**: Implements core OPDS 2.0 structures (Catalog, Publication, Search)
 - 🔍 **Search Support**: Abstract DataProvider class for implementing custom search
+- 🗺️ **Flexible Mapping**: Separate data retrieval from OPDS feed generation with ItemMapping
 - 🚀 **Easy to Use**: Simple API for creating catalogs and feeds
 - ✅ **Tested**: Comprehensive test suite included
 
@@ -28,33 +29,33 @@ pip install -e ".[dev]"
 
 ### 1. Create a DataProvider
 
-Extend the `DataProvider` abstract class to implement your search logic:
+Extend the `DataProvider` abstract class to implement your search logic. The new architecture separates data retrieval from OPDS feed generation:
 
 ```python
-from opds2 import DataProvider, Publication, Metadata, Link, Contributor
-from typing import List
+from opds2 import DataProvider, ItemMapping, SearchResult
 
 class MyDataProvider(DataProvider):
-    def search(self, query: str, limit: int = 50, offset: int = 0) -> List[Publication]:
-        # Your search implementation here
-        results = your_search_function(query, limit, offset)
+    def search(self, query: str, page: int = 1, rows: int = 50) -> SearchResult:
+        # Your search implementation here - returns raw data
+        results = your_search_function(query, page=page, limit=rows)
         
-        # Convert to Publication objects
-        publications = []
-        for item in results:
-            metadata = Metadata(
-                title=item.title,
-                author=[Contributor(name=item.author, role="author")],
-                language=[item.language]
-            )
-            links = [Link(
-                href=item.url,
-                type="application/epub+zip",
-                rel="http://opds-spec.org/acquisition"
-            )]
-            publications.append(Publication(metadata=metadata, links=links))
-        
-        return publications
+        return SearchResult(
+            items=results['docs'],          # Raw item dictionaries
+            page=page,
+            num_found=results['total'],     # Total matching items
+            rows=rows
+        )
+    
+    def get_item_mapping(self) -> ItemMapping:
+        # Define how to map your raw data to OPDS fields
+        return ItemMapping(
+            title=lambda item: item.get("title"),
+            author=lambda item: item.get("author_names", []),
+            description=lambda item: item.get("description"),
+            cover_url=lambda item: item.get("cover_url"),
+            acquisition_link=lambda item: item.get("download_url"),
+            acquisition_type=lambda item: "application/epub+zip",
+        )
 ```
 
 ### 2. Create a Catalog
@@ -83,13 +84,48 @@ provider = MyDataProvider()
 search_results = create_search_catalog(
     provider=provider,
     query="science fiction",
-    limit=20,
+    page=1,
+    rows=20,
     self_link="https://example.com/search?q=science+fiction"
 )
 
 # Export to JSON
 json_output = search_results.model_dump_json()
 ```
+
+## Architecture
+
+The library uses a clean separation of concerns:
+
+1. **DataProvider**: Retrieves raw data from your source (API, database, etc.)
+   - `search()` returns `SearchResult` with raw items
+   - `get_item_mapping()` defines field mappings
+
+2. **ItemMapping**: Maps raw data fields to OPDS standard fields
+   - Uses lambda functions for flexible field extraction
+   - Supports OPDS reserved fields: `title`, `author`, `description`, `cover_url`, etc.
+
+3. **OPDS Generation**: The library handles conversion to OPDS format
+   - Uses list comprehension to map items efficiently
+   - Generates compliant OPDS 2.0 JSON-LD output
+
+## OPDS Reserved Fields
+
+The library defines standard fields that can be mapped from your data:
+
+- `title` - Publication title (required)
+- `identifier` - Unique identifier
+- `description` - Description or summary
+- `language` - Language code(s)
+- `author` - Author name(s)
+- `publisher` - Publisher name(s)
+- `published` - Publication date
+- `modified` - Last modification date
+- `cover_url` - Cover image URL
+- `thumbnail_url` - Thumbnail image URL
+- `acquisition_link` - Download/access URL
+- `acquisition_type` - MIME type of resource
+- `subject` - Subject tags
 
 ## Example Output
 
@@ -127,6 +163,13 @@ json_output = search_results.model_dump_json()
           "type": "application/epub+zip",
           "rel": "http://opds-spec.org/acquisition"
         }
+      ],
+      "images": [
+        {
+          "href": "https://example.com/covers/pride.jpg",
+          "type": "image/jpeg",
+          "rel": "http://opds-spec.org/image"
+        }
       ]
     }
   ]
@@ -144,6 +187,12 @@ json_output = search_results.model_dump_json()
 - **`Contributor`**: Authors, illustrators, publishers, etc.
 - **`Navigation`**: Navigation links for browsing
 
+### Type Definitions
+
+- **`SearchResult`**: Standardized search result container
+- **`ItemMapping`**: Field mapping configuration
+- **`OPDS_RESERVED_FIELDS`**: Dictionary of standard OPDS fields
+
 ### Helper Functions
 
 - **`create_catalog()`**: Create a basic catalog with optional search
@@ -152,6 +201,8 @@ json_output = search_results.model_dump_json()
 ### Abstract Classes
 
 - **`DataProvider`**: Extend this to implement your search logic
+  - `search()` - Return SearchResult with raw data
+  - `get_item_mapping()` - Define field mappings
 
 ## Development
 
@@ -161,11 +212,22 @@ json_output = search_results.model_dump_json()
 pytest tests/ -v
 ```
 
-### Running the Example
+### Running the Examples
 
 ```bash
+# Basic usage example
 python examples/basic_usage.py
+
+# OpenLibrary integration example
+python examples/openlibrary_example.py
 ```
+
+## Examples
+
+The repository includes two complete examples:
+
+1. **`examples/basic_usage.py`** - Simple in-memory book provider
+2. **`examples/openlibrary_example.py`** - Real-world Open Library API integration
 
 ## Inspiration
 
