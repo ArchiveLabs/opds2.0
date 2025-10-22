@@ -254,10 +254,10 @@ class TestIntegration:
         assert result.rows == 50
         assert len(result.items) == 2
         
-        # Test mapping
+        # Test mapping - legacy field names are mapped to schema.org equivalents
         mapping = provider.get_item_mapping()
         mapped = mapping.map_item(result.items[0])
-        assert mapped["title"] == "Book A"
+        assert mapped["name"] == "Book A"  # title -> name
         assert mapped["author"] == ["Author A"]
-        assert "cover_url" in mapped
-        assert "123.jpg" in mapped["cover_url"]
+        assert "image" in mapped  # cover_url -> image
+        assert "123.jpg" in mapped["image"]

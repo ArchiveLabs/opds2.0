@@ -56,6 +56,8 @@ def create_catalog(
 def _map_item_to_publication(item_data: dict, provider: DataProvider) -> Publication:
     """Map a raw item to a Publication using the provider's mapping.
     
+    Supports both schema.org field names and legacy OPDS field names.
+    
     Args:
         item_data: Raw item data from the provider
         provider: DataProvider instance with mapping configuration
@@ -66,27 +68,50 @@ def _map_item_to_publication(item_data: dict, provider: DataProvider) -> Publica
     # Get the mapping from the provider
     mapping = provider.get_item_mapping()
     
-    # Apply the mapping to get OPDS-compatible fields
+    # Apply the mapping to get schema.org-compatible fields
     mapped = mapping.map_item(item_data)
     
     # Build metadata
     metadata_kwargs = {}
     
-    # Handle title (required)
-    metadata_kwargs['title'] = mapped.get('title', 'Untitled')
+    # Handle title (required) - supports both 'name' (schema.org) and 'title' (legacy)
+    metadata_kwargs['title'] = mapped.get('name', mapped.get('title', 'Untitled'))
     
-    # Handle optional text fields
-    for field in ['identifier', 'description', 'published', 'modified']:
-        if field in mapped:
-            metadata_kwargs[field] = mapped[field]
+    # Handle identifier
+    if 'identifier' in mapped:
+        metadata_kwargs['identifier'] = mapped['identifier']
     
-    # Handle list fields
-    for field in ['language', 'subject']:
-        if field in mapped:
+    # Handle description
+    if 'description' in mapped:
+        metadata_kwargs['description'] = mapped['description']
+    
+    # Handle dates - support both schema.org and legacy names
+    if 'datePublished' in mapped:
+        metadata_kwargs['published'] = mapped['datePublished']
+    elif 'published' in mapped:
+        metadata_kwargs['published'] = mapped['published']
+    
+    if 'dateModified' in mapped:
+        metadata_kwargs['modified'] = mapped['dateModified']
+    elif 'modified' in mapped:
+        metadata_kwargs['modified'] = mapped['modified']
+    
+    # Handle language - support both 'inLanguage' (schema.org) and 'language' (legacy)
+    language = mapped.get('inLanguage', mapped.get('language'))
+    if language is not None:
+        metadata_kwargs['language'] = language if isinstance(language, list) else [language]
+    
+    # Handle subject - support schema.org fields (about, keywords, genre) and legacy 'subject'
+    subjects = []
+    for field in ['about', 'keywords', 'genre', 'subject']:
+        if field in mapped and mapped[field]:
             value = mapped[field]
-            if value is not None:
-                # Ensure it's a list
-                metadata_kwargs[field] = value if isinstance(value, list) else [value]
+            if isinstance(value, list):
+                subjects.extend(value)
+            else:
+                subjects.append(value)
+    if subjects:
+        metadata_kwargs['subject'] = subjects
     
     # Handle contributors (author, publisher, etc.)
     for role in ['author', 'publisher']:
@@ -112,27 +137,32 @@ def _map_item_to_publication(item_data: dict, provider: DataProvider) -> Publica
     # Build links
     links = []
     
-    # Add acquisition link if provided
-    if 'acquisition_link' in mapped and mapped['acquisition_link']:
-        link_type = mapped.get('acquisition_type', 'application/octet-stream')
+    # Add acquisition link - support both 'url' (schema.org) and 'acquisition_link' (legacy)
+    acquisition_url = mapped.get('url', mapped.get('acquisition_link'))
+    if acquisition_url:
+        # Support both 'encodingFormat' (schema.org) and 'acquisition_type' (legacy)
+        link_type = mapped.get('encodingFormat', mapped.get('acquisition_type', 'application/octet-stream'))
         links.append(Link(
-            href=mapped['acquisition_link'],
+            href=acquisition_url,
             type=link_type,
             rel="http://opds-spec.org/acquisition"
         ))
     
     # Build images list for cover/thumbnail
+    # Support both schema.org and legacy field names
     images = []
-    if 'cover_url' in mapped and mapped['cover_url']:
+    cover_url = mapped.get('image', mapped.get('cover_url'))
+    if cover_url:
         images.append(Link(
-            href=mapped['cover_url'],
+            href=cover_url,
             type="image/jpeg",
             rel="http://opds-spec.org/image"
         ))
     
-    if 'thumbnail_url' in mapped and mapped['thumbnail_url']:
+    thumbnail = mapped.get('thumbnailUrl', mapped.get('thumbnail_url'))
+    if thumbnail:
         images.append(Link(
-            href=mapped['thumbnail_url'],
+            href=thumbnail,
             type="image/jpeg",
             rel="http://opds-spec.org/image/thumbnail"
         ))

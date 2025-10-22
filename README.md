@@ -101,31 +101,64 @@ The library uses a clean separation of concerns:
    - `search()` returns `SearchResult` with raw items
    - `get_item_mapping()` defines field mappings
 
-2. **ItemMapping**: Maps raw data fields to OPDS standard fields
+2. **ItemMapping**: Maps raw data fields to schema.org vocabulary
    - Uses lambda functions for flexible field extraction
-   - Supports OPDS reserved fields: `title`, `author`, `description`, `cover_url`, etc.
+   - Based on schema.org types (Book, Person, CreativeWork)
+   - Supports legacy OPDS field names for backwards compatibility
 
 3. **OPDS Generation**: The library handles conversion to OPDS format
    - Uses list comprehension to map items efficiently
    - Generates compliant OPDS 2.0 JSON-LD output
 
-## OPDS Reserved Fields
+## Schema.org Integration
 
-The library defines standard fields that can be mapped from your data:
+Field names are based on [schema.org](https://schema.org) vocabulary to promote interoperability and standardization. The library primarily uses types from:
 
-- `title` - Publication title (required)
-- `identifier` - Unique identifier
-- `description` - Description or summary
-- `language` - Language code(s)
-- `author` - Author name(s)
-- `publisher` - Publisher name(s)
-- `published` - Publication date
-- `modified` - Last modification date
-- `cover_url` - Cover image URL
-- `thumbnail_url` - Thumbnail image URL
-- `acquisition_link` - Download/access URL
-- `acquisition_type` - MIME type of resource
-- `subject` - Subject tags
+- **[schema.org/Book](https://schema.org/Book)** - For publication metadata
+- **[schema.org/Person](https://schema.org/Person)** - For authors and contributors  
+- **[schema.org/CreativeWork](https://schema.org/CreativeWork)** - For general content properties
+
+### Schema.org Fields
+
+The library defines standard schema.org fields that can be mapped from your data:
+
+| Schema.org Field | Type | Description | Legacy Name |
+|-----------------|------|-------------|-------------|
+| `name` | Text | Title of the publication | `title` |
+| `identifier` | Text/URL | Unique identifier (ISBN, URI) | `identifier` |
+| `description` | Text | Description or summary | `description` |
+| `inLanguage` | Text/List | Language code(s) | `language` |
+| `author` | Person/List | Author(s) | `author` |
+| `publisher` | Organization/List | Publisher(s) | `publisher` |
+| `datePublished` | Date | Publication date | `published` |
+| `dateModified` | Date | Last modification date | `modified` |
+| `image` | URL | Cover image URL | `cover_url` |
+| `thumbnailUrl` | URL | Thumbnail image URL | `thumbnail_url` |
+| `url` | URL | Resource URL | `acquisition_link` |
+| `encodingFormat` | Text | MIME type | `acquisition_type` |
+| `about` | Text/List | Subject matter | `subject` |
+| `keywords` | Text/List | Keywords/tags | - |
+| `genre` | Text | Genre | - |
+
+### Backwards Compatibility
+
+Legacy field names (e.g., `title`, `cover_url`, `acquisition_link`) are still supported and automatically mapped to their schema.org equivalents:
+
+```python
+# Both of these work identically:
+
+# Using schema.org field names (recommended)
+ItemMapping(
+    name=lambda item: item.get("title"),
+    image=lambda item: item.get("cover")
+)
+
+# Using legacy field names (backwards compatible)
+ItemMapping(
+    title=lambda item: item.get("title"),  # Mapped to 'name'
+    cover_url=lambda item: item.get("cover")  # Mapped to 'image'
+)
+```
 
 ## Example Output
 
@@ -189,9 +222,10 @@ The library defines standard fields that can be mapped from your data:
 
 ### Type Definitions
 
-- **`SearchResult`**: Standardized search result container
-- **`ItemMapping`**: Field mapping configuration
-- **`OPDS_RESERVED_FIELDS`**: Dictionary of standard OPDS fields
+- **`SearchResult`**: Standardized search result container with pagination info
+- **`ItemMapping`**: Field mapping configuration using schema.org vocabulary
+- **`SCHEMA_ORG_FIELDS`**: Dictionary of schema.org field definitions
+- **`OPDS_RESERVED_FIELDS`**: Legacy field name mappings (for backwards compatibility)
 
 ### Helper Functions
 

@@ -18,6 +18,7 @@ from opds2.provider import DataProvider
 from opds2.types import (
     ItemMapping,
     OPDS_RESERVED_FIELDS,
+    SCHEMA_ORG_FIELDS,
     SearchResult,
 )
 
@@ -30,6 +31,7 @@ __all__ = [
     "Metadata",
     "OPDS_RESERVED_FIELDS",
     "Publication",
+    "SCHEMA_ORG_FIELDS",
     "SearchResult",
     "create_catalog",
     "create_search_catalog",

@@ -47,7 +47,7 @@ def test_opds_reserved_fields():
 
 
 def test_item_mapping_basic():
-    """Test basic ItemMapping functionality."""
+    """Test basic ItemMapping functionality with legacy field names."""
     mapping = ItemMapping(
         title=lambda item: item.get("title"),
         author=lambda item: [item.get("author")]
@@ -56,7 +56,22 @@ def test_item_mapping_basic():
     item = {"title": "Test Book", "author": "Test Author"}
     result = mapping.map_item(item)
     
-    assert result["title"] == "Test Book"
+    # Legacy field names are mapped to schema.org equivalents
+    assert result["name"] == "Test Book"  # title -> name
+    assert result["author"] == ["Test Author"]
+
+
+def test_item_mapping_schema_org():
+    """Test ItemMapping with schema.org field names."""
+    mapping = ItemMapping(
+        name=lambda item: item.get("title"),
+        author=lambda item: [item.get("author")]
+    )
+    
+    item = {"title": "Test Book", "author": "Test Author"}
+    result = mapping.map_item(item)
+    
+    assert result["name"] == "Test Book"
     assert result["author"] == ["Test Author"]
 
 
@@ -70,12 +85,12 @@ def test_item_mapping_none_values():
     item = {"title": "Test Book"}  # No author field
     result = mapping.map_item(item)
     
-    assert "title" in result
+    assert "name" in result  # title -> name (schema.org)
     assert "author" not in result  # None values should not be in result
 
 
 def test_item_mapping_complex_transformation():
-    """Test ItemMapping with complex transformations."""
+    """Test ItemMapping with complex transformations using legacy field names."""
     mapping = ItemMapping(
         title=lambda item: item.get("name", "").upper(),
         author=lambda item: [a.strip() for a in item.get("authors", "").split(",") if a.strip()],
@@ -90,13 +105,14 @@ def test_item_mapping_complex_transformation():
     
     result = mapping.map_item(item)
     
-    assert result["title"] == "TEST BOOK"
+    # Legacy fields are mapped to schema.org equivalents
+    assert result["name"] == "TEST BOOK"  # title -> name
     assert result["author"] == ["Author One", "Author Two"]
-    assert result["cover_url"] == "https://example.com/covers/123.jpg"
+    assert result["image"] == "https://example.com/covers/123.jpg"  # cover_url -> image
 
 
 def test_item_mapping_all_fields():
-    """Test ItemMapping with all OPDS fields."""
+    """Test ItemMapping with all OPDS fields using legacy field names."""
     mapping = ItemMapping(
         title=lambda item: item["title"],
         identifier=lambda item: item.get("id"),
@@ -131,20 +147,20 @@ def test_item_mapping_all_fields():
     
     result = mapping.map_item(item)
     
-    # Verify all fields are mapped
-    assert result["title"] == "Complete Book"
+    # Verify all fields are mapped to schema.org equivalents
+    assert result["name"] == "Complete Book"  # title -> name
     assert result["identifier"] == "book-123"
     assert result["description"] == "A complete book"
-    assert result["language"] == ["en"]
+    assert result["inLanguage"] == ["en"]  # language -> inLanguage
     assert result["author"] == ["Author One"]
     assert result["publisher"] == ["Publisher One"]
-    assert result["published"] == "2024-01-01"
-    assert result["modified"] == "2024-02-01"
-    assert result["cover_url"] == "https://example.com/cover.jpg"
-    assert result["thumbnail_url"] == "https://example.com/thumb.jpg"
-    assert result["acquisition_link"] == "https://example.com/book.epub"
-    assert result["acquisition_type"] == "application/epub+zip"
-    assert result["subject"] == ["Fiction", "Drama"]
+    assert result["datePublished"] == "2024-01-01"  # published -> datePublished
+    assert result["dateModified"] == "2024-02-01"  # modified -> dateModified
+    assert result["image"] == "https://example.com/cover.jpg"  # cover_url -> image
+    assert result["thumbnailUrl"] == "https://example.com/thumb.jpg"  # thumbnail_url -> thumbnailUrl
+    assert result["url"] == "https://example.com/book.epub"  # acquisition_link -> url
+    assert result["encodingFormat"] == "application/epub+zip"  # acquisition_type -> encodingFormat
+    assert result["about"] == ["Fiction", "Drama"]  # subject -> about
 
 
 def test_item_mapping_partial_fields():
@@ -163,8 +179,8 @@ def test_item_mapping_partial_fields():
     result = mapping.map_item(item)
     
     assert len(result) == 2
-    assert "title" in result
-    assert "cover_url" in result
+    assert "name" in result  # title -> name (schema.org)
+    assert "image" in result  # cover_url -> image (schema.org)
     assert "author" not in result  # Not mapped
 
 
@@ -188,3 +204,21 @@ def test_search_result_with_metadata():
     # For page 2 with 2 rows, we'd be at offset 2
     expected_offset = (result.page - 1) * result.rows
     assert expected_offset == 2
+
+
+def test_schema_org_fields_exist():
+    """Test that SCHEMA_ORG_FIELDS is defined and contains expected fields."""
+    from opds2.types import SCHEMA_ORG_FIELDS
+    
+    expected_schema_fields = {
+        "name", "identifier", "description", "inLanguage",
+        "author", "publisher", "datePublished", "dateModified",
+        "image", "thumbnailUrl", "about", "keywords", "genre",
+        "url", "encoding", "encodingFormat"
+    }
+    
+    assert set(SCHEMA_ORG_FIELDS.keys()) == expected_schema_fields
+    
+    # Verify each has a description mentioning schema.org
+    for field, description in SCHEMA_ORG_FIELDS.items():
+        assert "schema.org" in description.lower(), f"{field} should reference schema.org"

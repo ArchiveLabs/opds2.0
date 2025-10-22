@@ -248,8 +248,9 @@ def test_item_mapping():
     
     mapped = mapping.map_item(test_item)
     
-    assert mapped["title"] == "Test Book"
+    # Legacy field names are mapped to schema.org equivalents
+    assert mapped["name"] == "Test Book"  # title -> name
     assert mapped["author"] == ["Test Author"]
-    assert mapped["language"] == ["en"]
-    assert mapped["acquisition_link"] == "https://example.com/test.epub"
-    assert mapped["acquisition_type"] == "application/epub+zip"
+    assert mapped["inLanguage"] == ["en"]  # language -> inLanguage
+    assert mapped["url"] == "https://example.com/test.epub"  # acquisition_link -> url
+    assert mapped["encodingFormat"] == "application/epub+zip"  # acquisition_type -> encodingFormat
