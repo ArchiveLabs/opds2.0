@@ -6,7 +6,7 @@ Based on the OPDS 2.0 specification and Web Publication Manifest.
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field # field_validator
 
 
 class Link(BaseModel):
@@ -112,7 +112,7 @@ class Catalog(BaseModel):
 
     model_config = {"extra": "allow"}
 
-    @field_validator("links", mode="before")
+    #@field_validator("links", mode="before")
     @classmethod
     def ensure_self_link(cls, v: List[Link]) -> List[Link]:
         """Ensure there's at least a structure for links."""
