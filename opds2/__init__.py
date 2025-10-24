@@ -12,16 +12,20 @@ from opds2.models import (
     Contributor,
     Link,
     Metadata,
+    Navigation,
     Publication,
 )
 from opds2.provider import DataProvider, DataProviderRecord
 
 __all__ = [
+    "create_catalog",
+    "create_search_catalog",
     "Catalog",
     "Contributor",
     "DataProvider",
     "DataProviderRecord",
     "Link",
     "Metadata",
+    "Navigation",
     "Publication",
 ]
