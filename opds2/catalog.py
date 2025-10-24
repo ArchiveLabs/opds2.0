@@ -4,7 +4,6 @@ from typing import List, Optional
 from datetime import datetime, timezone
 
 from opds2.models import Catalog, Link, Metadata, Publication
-from opds2.provider import DataProvider
 
 
 def create_catalog(
@@ -54,7 +53,7 @@ def create_catalog(
 
 
 def create_search_catalog(
-    provider: DataProvider,
+    provider,
     query: str,
     limit: int = 50,
     offset: int = 0,

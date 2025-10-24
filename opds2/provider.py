@@ -6,9 +6,11 @@ Data providers implement the logic for searching and retrieving publications.
 from abc import ABC, abstractmethod
 from typing import List, Optional
 
-from opds2.models import Metadata
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from typing import Optional
+
+from opds2.models import Metadata, Publication, Link
+from opds2.catalog import create_catalog
 
 
 class DataProviderRecord(BaseModel, ABC):
@@ -18,9 +20,27 @@ class DataProviderRecord(BaseModel, ABC):
     their own data record structure.
     """
 
+    def to_publication(self) -> Publication:
+        """Convert DataProviderRecord to OPDS Publication."""
+        return Publication(
+            metadata=self.metadata(),
+            links=[],
+            images=None
+        )
+
     @abstractmethod
     def metadata(self) -> Metadata:
         """Return DataProviderRecord as OPDS Metadata."""
+        pass
+
+    @abstractmethod
+    def links(self) -> List[Link]:
+        """Return list of Links associated with this record."""
+        pass
+
+    @abstractmethod
+    def images(self) -> Optional[List[Link]]:
+        """Return list of Images associated with this record."""
         pass
 
 
@@ -38,9 +58,24 @@ class DataProvider(ABC):
                 return [self._to_publication(item) for item in results]
     """
     
+    TITLE: str = "Generic OPDS Service"
+    URL: str = "http://localhost/"
+    CATALOG_URL: str = "/opds/catalog"
+    SEARCH_URL: str = "/opds/search{?query}"
+    
+    @classmethod
+    def create_catalog(cls, publications: List[Publication], identifier=""):
+        return create_catalog(
+            title=cls.TITLE,
+            publications=publications,
+            self_link=cls.CATALOG_URL,
+            search_link=cls.SEARCH_URL,
+            identifier=identifier
+        )
+
+    @staticmethod
     @abstractmethod
     def search(
-        self,
         query: str,
         limit: int = 50,
         offset: int = 0,
