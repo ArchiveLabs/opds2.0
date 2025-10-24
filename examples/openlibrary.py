@@ -5,7 +5,6 @@ from pydantic import BaseModel, Field
 from opds2.provider import DataProvider, DataProviderRecord
 from opds2.models import Contributor, Metadata, Link
 
-
 class OpenLibraryDataRecord(DataProviderRecord):
 
     # Edition provider model
@@ -49,6 +48,12 @@ class OpenLibraryDataRecord(DataProviderRecord):
         """Type _should_ be improved to dynamically return type based on record data."""
         return "http://schema.org/Book"
     
+    def links(self) -> List[Link]:
+        return []
+    
+    def images(self) -> Optional[List[Link]]:
+        return []
+    
     def metadata(self) -> Metadata:
         """Return this record as OPDS Metadata."""
         def get_authors() -> Optional[List[Contributor]]:
@@ -83,8 +88,8 @@ class OpenLibraryDataProvider(DataProvider):
     """Data provider for Open Library records."""
     URL = "https://openlibrary.org"
 
+    @staticmethod
     def search(
-        self,
         query: str,
         limit: int = 50,
         offset: int = 0,
@@ -109,12 +114,12 @@ class OpenLibraryDataProvider(DataProvider):
             # Unpack editions field if present
             if "editions" in doc and isinstance(doc["editions"], dict):
                 doc = dict(doc)
-                doc["editions"] = OpenLibraryDataRecord.EditionsInfo.parse_obj(doc["editions"])
-            records.append(OpenLibraryDataRecord.parse_obj(doc))
+                doc["editions"] = OpenLibraryDataRecord.EditionsInfo.model_validate(doc["editions"])
+            records.append(OpenLibraryDataRecord.model_validate(doc))
         return records, data.get("numFound", 0)
 
-# Fix Pydantic ForwardRef error for nested models: Don't even worry about this
-OpenLibraryDataRecord.EditionProvider.update_forward_refs()
-OpenLibraryDataRecord.EditionDoc.update_forward_refs()
-OpenLibraryDataRecord.EditionsInfo.update_forward_refs()
-OpenLibraryDataRecord.update_forward_refs()
+if __name__ == "__main__":
+    records, num_found = OpenLibraryDataProvider.search(query="python programming", limit=2)
+    publications = [record.to_publication() for record in records]
+    OpenLibraryDataProvider.create_catalog(publications=publications)
+    # now we need to create the catalog
