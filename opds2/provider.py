@@ -20,14 +20,6 @@ class DataProviderRecord(BaseModel, ABC):
     their own data record structure.
     """
 
-    def to_publication(self) -> Publication:
-        """Convert DataProviderRecord to OPDS Publication."""
-        return Publication(
-            metadata=self.metadata(),
-            links=[],
-            images=None
-        )
-
     @abstractmethod
     def metadata(self) -> Metadata:
         """Return DataProviderRecord as OPDS Metadata."""
@@ -42,6 +34,14 @@ class DataProviderRecord(BaseModel, ABC):
     def images(self) -> Optional[List[Link]]:
         """Return list of Images associated with this record."""
         pass
+
+    def to_publication(self) -> Publication:
+        """Convert DataProviderRecord to OPDS Publication."""
+        return Publication(
+            metadata=self.metadata(),
+            links=self.links(),
+            images=self.images()
+        )
 
 
 class DataProvider(ABC):

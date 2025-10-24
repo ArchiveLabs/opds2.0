@@ -2,12 +2,16 @@ import requests
 from typing import List, Optional
 from pydantic import BaseModel, Field
 
-from opds2.provider import DataProvider, DataProviderRecord
-from opds2.models import Contributor, Metadata, Link
+from opds2 import (
+    DataProvider,
+    DataProviderRecord,
+    Contributor,
+    Metadata,
+    Link
+)
 
 class OpenLibraryDataRecord(DataProviderRecord):
 
-    # Edition provider model
     class EditionProvider(BaseModel):
         access: Optional[str] = None
         format: Optional[str] = None
@@ -15,7 +19,6 @@ class OpenLibraryDataRecord(DataProviderRecord):
         url: Optional[str] = None
         provider_name: Optional[str] = None
 
-    # Edition doc model
     class EditionDoc(BaseModel):
         key: Optional[str] = None
         title: Optional[str] = None
@@ -23,7 +26,6 @@ class OpenLibraryDataRecord(DataProviderRecord):
         ebook_access: Optional[str] = None
         providers: Optional[list["OpenLibraryDataRecord.EditionProvider"]] = None
 
-    # Editions field model
     class EditionsInfo(BaseModel):
         numFound: Optional[int] = None
         start: Optional[int] = None
@@ -52,8 +54,11 @@ class OpenLibraryDataRecord(DataProviderRecord):
         return []
     
     def images(self) -> Optional[List[Link]]:
-        return []
-    
+        if self.cover_i:
+            cover_url = f"https://covers.openlibrary.org/b/id/{self.cover_i}-L.jpg"
+            return [Link(href=cover_url, type="image/jpeg", rel="cover")]
+        return None
+        
     def metadata(self) -> Metadata:
         """Return this record as OPDS Metadata."""
         def get_authors() -> Optional[List[Contributor]]:
@@ -81,12 +86,14 @@ class OpenLibraryDataRecord(DataProviderRecord):
             language=self.language
         )
     
-    # TODO: add links, images, methods etc
 
 
 class OpenLibraryDataProvider(DataProvider):
     """Data provider for Open Library records."""
-    URL = "https://openlibrary.org"
+    URL: str = "https://openlibrary.org"
+    TITLE: str = "OpenLibrary.org OPDS Service"
+    CATALOG_URL: str = "/opds/catalog"
+    SEARCH_URL: str = "/opds/search{?query}"
 
     @staticmethod
     def search(
@@ -119,7 +126,7 @@ class OpenLibraryDataProvider(DataProvider):
         return records, data.get("numFound", 0)
 
 if __name__ == "__main__":
-    records, num_found = OpenLibraryDataProvider.search(query="python programming", limit=2)
-    publications = [record.to_publication() for record in records]
-    OpenLibraryDataProvider.create_catalog(publications=publications)
-    # now we need to create the catalog
+    records, num_found = OpenLibraryDataProvider.search(query="python programming", limit=10)
+    OpenLibraryDataProvider.create_catalog(publications=[
+        record.to_publication() for record in records
+    ]).model_dump()
