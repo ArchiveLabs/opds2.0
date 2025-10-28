@@ -101,7 +101,7 @@ class Catalog(BaseModel):
         None,
         description="Navigation links for browsing"
     )
-    groups: Optional[List[Dict[str, Any]]] = Field(
+    groups: Optional[List['Catalog']] = Field(
         None,
         description="Grouped collections of publications"
     )
