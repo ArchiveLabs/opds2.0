@@ -6,13 +6,12 @@ Data providers implement the logic for searching and retrieving publications.
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import List, Optional
-from urllib.parse import urlencode
 
 from pydantic import BaseModel
 from typing import Optional
 
 from opds2.models import Metadata, Publication, Link, Catalog
-from opds2.catalog import create_catalog
+from opds2.catalog import create_catalog, add_pagination
 
 
 class DataProviderRecord(BaseModel, ABC):
@@ -123,8 +122,17 @@ class DataProvider(ABC):
             offset=offset,
             sort=sort,
         )
-        page = (offset // limit) + 1 if limit else 1
         publications = [record.to_publication() for record in results]
+        
+        # Create base catalog
+        catalog = Catalog(
+            metadata=Metadata(title=title),
+            publications=publications,
+            links=[]
+        )
+        
+        # Prepare params for pagination
+        page = (offset // limit) + 1 if limit else 1
         params: dict[str, str] = {}
         if query:
             params["query"] = query
@@ -135,59 +143,13 @@ class DataProvider(ABC):
         if sort:
             params["sort"] = sort
         
-        links: list[Link] = []
+        # Add pagination using the new add_pagination function
         base_url = self.SEARCH_URL.replace("{?query}", "")
-
-        self_url = base_url + ("?" + urlencode(params) if params else "")
-        links.append(
-            Link(
-                rel="self",
-                href=self_url,
-                type="application/opds+json",
-            )
-        )
-        links.append(
-            Link(
-                rel="first",
-                href=base_url + "?" + urlencode(params | {"page": "1"}),
-                type="application/opds+json",
-            )
-        )
-
-        if page > 1:
-            links.append(
-                Link(
-                    rel="previous",
-                    href=base_url + "?" + urlencode(params | {"page": str(page - 1)}),
-                    type="application/opds+json",
-                )
-            )
-
-        has_more = (offset + limit) < total
-        if has_more:
-            links.append(
-                Link(
-                    rel="next",
-                    href=base_url + "?" + urlencode(params | {"page": str(page + 1)}),
-                    type="application/opds+json",
-                )
-            )
-            last_page = (total + limit - 1) // limit
-            links.append(
-                Link(
-                    rel="last",
-                    href=base_url + "?" + urlencode(params | {"page": str(last_page)}),
-                    type="application/opds+json",
-                )
-            )
-
-        return Catalog(
-            metadata=Metadata(
-                title=title,
-                numberOfItems=total,
-                itemsPerPage=limit,
-                currentPage=page,
-            ),
-            publications=publications,
-            links=links,
+        return add_pagination(
+            catalog=catalog,
+            total=total,
+            limit=limit,
+            offset=offset,
+            base_url=base_url,
+            params=params
         )

@@ -9,6 +9,7 @@ from opds2 import (
     Metadata,
     Link
 )
+from opds2.catalog import add_pagination
 
 class OpenLibraryDataRecord(DataProviderRecord):
 
@@ -126,7 +127,41 @@ class OpenLibraryDataProvider(DataProvider):
         return records, data.get("numFound", 0)
 
 if __name__ == "__main__":
+    # Basic example without pagination
     records, num_found = OpenLibraryDataProvider.search(query="python programming", limit=10)
-    OpenLibraryDataProvider.create_catalog(publications=[
+    basic_catalog = OpenLibraryDataProvider.create_catalog(publications=[
         record.to_publication() for record in records
-    ]).model_dump()
+    ])
+    print("Basic catalog (no pagination):")
+    print(basic_catalog.model_dump())
+    print("\n" + "="*80 + "\n")
+    
+    # Example with pagination
+    query = "python programming"
+    limit = 10
+    offset = 0
+    records, num_found = OpenLibraryDataProvider.search(query=query, limit=limit, offset=offset)
+    
+    # Create catalog with publications
+    catalog_with_pagination = OpenLibraryDataProvider.create_catalog(
+        publications=[record.to_publication() for record in records]
+    )
+    
+    # Add pagination to the catalog
+    base_url = OpenLibraryDataProvider.SEARCH_URL.replace("{?query}", "")
+    params = {
+        "query": query,
+        "limit": str(limit)
+    }
+    
+    catalog_with_pagination = add_pagination(
+        catalog=catalog_with_pagination,
+        total=num_found,
+        limit=limit,
+        offset=offset,
+        base_url=base_url,
+        params=params
+    )
+    
+    print("Catalog with pagination:")
+    print(catalog_with_pagination.model_dump())

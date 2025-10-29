@@ -2,6 +2,7 @@
 
 from typing import List, Optional
 from datetime import datetime, timezone
+from urllib.parse import urlencode
 
 from opds2.models import Catalog, Link, Metadata, Publication
 
@@ -50,6 +51,59 @@ def create_catalog(
         links=links,
         publications=publications or []
     )
+
+
+def add_pagination(
+    catalog: Catalog,
+    total: int,
+    limit: int,
+    offset: int,
+    base_url: str,
+    params: dict[str, str]
+) -> Catalog:
+    """Add pagination links and metadata to an existing Catalog.
+    
+    Args:
+        catalog: The catalog to add pagination to
+        total: Total number of items available
+        limit: Maximum number of items per page
+        offset: Current offset for pagination
+        base_url: Base URL for pagination links
+        params: Query parameters to include in pagination links
+        
+    Returns:
+        The catalog with pagination links and metadata added
+    """
+    page = (offset // limit) + 1 if limit else 1
+    last_page = (total + limit - 1) // limit if limit else 1
+    has_more = (offset + limit) < total
+
+    links = list(catalog.links or [])
+    
+    def make_link(rel: str, page_num: int):
+        href = f"{base_url}?{urlencode(params | {'page': str(page_num)})}"
+        return Link(rel=rel, href=href, type="application/opds+json")
+
+    # Always include self & first
+    links.append(make_link("self", page))
+    links.append(make_link("first", 1))
+
+    if page > 1:
+        links.append(make_link("previous", page - 1))
+    if has_more:
+        links.append(make_link("next", page + 1))
+        links.append(make_link("last", last_page))
+
+    catalog.links = links
+
+    # Update metadata
+    if not catalog.metadata:
+        catalog.metadata = Metadata(title="")
+    catalog.metadata.currentPage = page
+    catalog.metadata.itemsPerPage = limit
+    catalog.metadata.numberOfItems = total
+
+    return catalog
 
 
 def create_search_catalog(

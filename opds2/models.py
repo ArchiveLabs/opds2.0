@@ -54,6 +54,8 @@ class Metadata(BaseModel):
     publisher: Optional[List[Contributor]] = Field(None, description="Publishers")
     subject: Optional[List[str]] = Field(None, description="Subject tags")
     numberOfItems: Optional[int] = Field(None, description="Number of items in collection")
+    currentPage: Optional[int] = Field(None, description="Current page number for pagination")
+    itemsPerPage: Optional[int] = Field(None, description="Number of items per page for pagination")
 
     model_config = {"populate_by_name": True, "extra": "allow"}
 
