@@ -74,14 +74,15 @@ def add_pagination(
     Returns:
         The catalog with pagination links and metadata added
     """
-    page = (offset // limit) + 1 if limit else 1
-    last_page = (total + limit - 1) // limit if limit else 1
+    page = (offset // limit) + 1 if limit > 0 else 1
+    last_page = (total + limit - 1) // limit if limit > 0 else 1
     has_more = (offset + limit) < total
 
     links = list(catalog.links or [])
     
     def make_link(rel: str, page_num: int):
-        href = f"{base_url}?{urlencode(params | {'page': str(page_num)})}"
+        link_params = params | {'page': str(page_num)}
+        href = f"{base_url}?{urlencode(link_params)}"
         return Link(rel=rel, href=href, type="application/opds+json")
 
     # Always include self & first
