@@ -13,6 +13,7 @@ from opds2.models import (
     Link,
     Metadata,
     Navigation,
+    Paginator,
     Publication,
 )
 from opds2.provider import DataProvider, DataProviderRecord
@@ -28,5 +29,6 @@ __all__ = [
     "Link",
     "Metadata",
     "Navigation",
+    "Paginator",
     "Publication",
 ]

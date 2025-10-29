@@ -10,7 +10,7 @@ from typing import List, Optional
 from pydantic import BaseModel
 from typing import Optional
 
-from opds2.models import Metadata, Publication, Link, Catalog
+from opds2.models import Metadata, Publication, Link, Catalog, Paginator
 from opds2.catalog import create_catalog, add_pagination
 
 
@@ -65,14 +65,52 @@ class DataProvider(ABC):
     SEARCH_URL: str = "/opds/search{?query}"
     
     @classmethod
-    def create_catalog(cls, publications: List[Publication], identifier=""):
-        return create_catalog(
-            title=cls.TITLE,
+    def create_catalog(
+        cls,
+        publications: List[Publication],
+        identifier: str = "",
+        title: Optional[str] = None,
+        pagination: Optional[Paginator] = None
+    ):
+        """Create an OPDS catalog with optional pagination.
+        
+        Args:
+            publications: List of publications to include in the catalog
+            identifier: Optional unique identifier for the catalog
+            title: Optional title for the catalog (defaults to cls.TITLE)
+            pagination: Optional Paginator object for adding pagination links
+            
+        Returns:
+            Catalog object with optional pagination
+        """
+        if title is None:
+            title = cls.TITLE
+            
+        catalog = create_catalog(
+            title=title,
             publications=publications,
             self_link=cls.CATALOG_URL,
             search_link=cls.SEARCH_URL,
             identifier=identifier
         )
+        
+        # Add pagination if provided
+        if pagination is not None:
+            params: dict[str, str] = {}
+            if pagination.sort:
+                params["sort"] = pagination.sort
+            
+            base_url = cls.SEARCH_URL.replace("{?query}", "")
+            catalog = add_pagination(
+                catalog=catalog,
+                total=pagination.numfound or 0,
+                limit=pagination.limit,
+                offset=pagination.offset,
+                base_url=base_url,
+                params=params
+            )
+        
+        return catalog
 
     @staticmethod
     @abstractmethod
@@ -94,62 +132,3 @@ class DataProvider(ABC):
             List of Publication objects matching the search criteria
         """
         pass
-
-    def search_catalog(
-        self,
-        title: Optional[str] = None,
-        query: str = "",
-        limit: int = 50,
-        offset: int = 0,
-        sort: Optional[str] = None,
-    ) -> Catalog:
-        """
-        Search for publications and return an OPDS Catalog.
-
-        Args:
-            title: Optional title for the catalog
-            query: Search query string
-            limit: Maximum number of results to return (default: 50)
-            offset: Offset for pagination (default: 0)
-            sort: Optional sorting parameter
-        """
-
-        if not title:
-            title = f"Search results for '{query}'"
-        results, total = self.search(
-            query=query,
-            limit=limit,
-            offset=offset,
-            sort=sort,
-        )
-        publications = [record.to_publication() for record in results]
-        
-        # Create base catalog
-        catalog = Catalog(
-            metadata=Metadata(title=title),
-            publications=publications,
-            links=[]
-        )
-        
-        # Prepare params for pagination
-        page = (offset // limit) + 1 if limit else 1
-        params: dict[str, str] = {}
-        if query:
-            params["query"] = query
-        if limit:
-            params["limit"] = str(limit)
-        if page > 1:
-            params["page"] = str(page)
-        if sort:
-            params["sort"] = sort
-        
-        # Add pagination using the new add_pagination function
-        base_url = self.SEARCH_URL.replace("{?query}", "")
-        return add_pagination(
-            catalog=catalog,
-            total=total,
-            limit=limit,
-            offset=offset,
-            base_url=base_url,
-            params=params
-        )

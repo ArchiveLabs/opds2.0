@@ -385,3 +385,89 @@ def test_add_pagination_url_format():
     # Check next link has page=3
     next_link = [link for link in paginated_catalog.links if link.rel == "next"][0]
     assert "page=3" in next_link.href
+
+
+def test_paginator_model():
+    """Test Paginator model creation."""
+    from opds2.models import Paginator
+    
+    # Test with defaults
+    paginator = Paginator()
+    assert paginator.limit == 50
+    assert paginator.page == 1
+    assert paginator.offset == 0
+    assert paginator.numfound is None
+    assert paginator.sort is None
+    
+    # Test with custom values
+    paginator = Paginator(
+        limit=10,
+        page=3,
+        offset=20,
+        numfound=100,
+        sort="title"
+    )
+    assert paginator.limit == 10
+    assert paginator.page == 3
+    assert paginator.offset == 20
+    assert paginator.numfound == 100
+    assert paginator.sort == "title"
+
+
+def test_create_catalog_with_pagination():
+    """Test DataProvider.create_catalog with pagination parameter."""
+    from opds2.models import Paginator
+    from opds2.provider import DataProvider, DataProviderRecord
+    
+    class TestRecord(DataProviderRecord):
+        title: str
+        
+        def metadata(self):
+            return Metadata(title=self.title)
+        
+        def links(self):
+            return [Link(href="/test", rel="self")]
+        
+        def images(self):
+            return None
+    
+    class TestProvider(DataProvider):
+        TITLE = "Test Library"
+        CATALOG_URL = "/catalog"
+        SEARCH_URL = "/search{?query}"
+        
+        @staticmethod
+        def search(query, limit=50, offset=0, sort=None):
+            records = [TestRecord(title=f"Book {i}") for i in range(1, 11)]
+            return records, 100
+    
+    # Test without pagination
+    catalog = TestProvider.create_catalog(
+        publications=[Publication(metadata=Metadata(title="Test"), links=[Link(href="/test")])]
+    )
+    assert catalog.metadata.title == "Test Library"
+    assert catalog.metadata.currentPage is None
+    assert catalog.metadata.itemsPerPage is None
+    
+    # Test with pagination
+    catalog_with_pagination = TestProvider.create_catalog(
+        publications=[Publication(metadata=Metadata(title="Test"), links=[Link(href="/test")])],
+        pagination=Paginator(
+            limit=10,
+            offset=20,
+            numfound=100,
+            sort="title"
+        )
+    )
+    
+    assert catalog_with_pagination.metadata.title == "Test Library"
+    assert catalog_with_pagination.metadata.currentPage == 3
+    assert catalog_with_pagination.metadata.itemsPerPage == 10
+    assert catalog_with_pagination.metadata.numberOfItems == 100
+    
+    # Test custom title
+    catalog_custom = TestProvider.create_catalog(
+        publications=[],
+        title="Custom Title"
+    )
+    assert catalog_custom.metadata.title == "Custom Title"

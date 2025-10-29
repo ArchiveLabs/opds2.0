@@ -24,6 +24,17 @@ class Link(BaseModel):
     model_config = {"extra": "allow"}
 
 
+class Paginator(BaseModel):
+    """Pagination parameters for OPDS catalogs."""
+    limit: int = Field(50, description="Maximum number of items per page")
+    page: int = Field(1, description="Current page number")
+    offset: int = Field(0, description="Offset for pagination")
+    numfound: Optional[int] = Field(None, description="Total number of items found")
+    sort: Optional[str] = Field(None, description="Sort parameter")
+
+    model_config = {"extra": "allow"}
+
+
 class Contributor(BaseModel):
     """Represents a contributor (author, illustrator, etc.)."""
     name: str = Field(..., description="Name of the contributor")
