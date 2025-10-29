@@ -27,30 +27,37 @@ To use this library, you must implement two key classes:
 ### Example
 
 ```python
-from opds2 import DataProvider, DataProviderRecord, Metadata, Link
+from opds2.catalog import add_pagination
+from opds2 import Paginator
+from pyopds2_openlibrary import OpenLibraryDataProvider
 
-class MyRecord(DataProviderRecord):
-		def metadata(self):
-				return Metadata(title="Example Book")
-		def links(self):
-				return [Link(href="/books/1", rel="self", type="application/epub+zip")]
-		def images(self):
-				return None
+# Get search results from any data provider
+records, num_found = OpenLibraryDataProvider.search(query="python", limit=10)
 
-class MyProvider(DataProvider):
-		@staticmethod
-		def search(query, limit=50, offset=0):
-				# Return a list of MyRecord instances and total count
-				records = [MyRecord()]
-				return records, len(records)
+# Create paginated catalog with publications
+catalog = OpenLibraryDataProvider.create_catalog(
+    publications=[record.to_publication() for record in records],
+    pagination=Paginator(
+        limit=10,
+        offset=0,
+        numfound=num_found
+    )
+)
 
-# Create a catalog
-from opds2.catalog import create_catalog
-catalog = MyProvider.create_catalog([r.to_publication() for r in records])
-print(catalog.model_dump_json(indent=2))
+# Or manually add pagination to any catalog
+catalog = add_pagination(
+    catalog=OpenLibraryDataProvider.create_catalog(
+        publications=[record.to_publication() for record in records]
+    ),
+    total=num_found,
+    limit=10,
+    offset=0,
+    base_url="/opds/search",
+    params={"query": "python", "limit": "10"}
+)
 ```
 
-See `examples/openlibrary.py` for a real-world integration with OpenLibrary.
+For a real-world integration example, see the [pyopds2_openlibrary](https://github.com/ArchiveLabs/pyopds2_openlibrary) package, which provides an OpenLibrary data provider implementation.
 
 
 ### API Reference
@@ -63,11 +70,13 @@ See `examples/openlibrary.py` for a real-world integration with OpenLibrary.
 - **`Link`**: Links to resources
 - **`Contributor`**: Authors, illustrators, publishers, etc.
 - **`Navigation`**: Navigation links for browsing
+- **`Paginator`**: Pagination parameters for catalogs
 
 #### Catalog Functions
 
 - **`create_catalog()`**: Create a basic catalog with optional search
 - **`create_search_catalog()`**: Create a catalog from search results
+- **`add_pagination()`**: Add pagination links and metadata to a catalog
 
 ## Similar Implementations
 

@@ -6,13 +6,12 @@ Data providers implement the logic for searching and retrieving publications.
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import List, Optional
-from urllib.parse import urlencode
 
 from pydantic import BaseModel
 from typing import Optional
 
-from opds2.models import Metadata, Publication, Link, Catalog
-from opds2.catalog import create_catalog
+from opds2.models import Metadata, Publication, Link, Catalog, Paginator
+from opds2.catalog import create_catalog, add_pagination
 
 
 class DataProviderRecord(BaseModel, ABC):
@@ -66,14 +65,58 @@ class DataProvider(ABC):
     SEARCH_URL: str = "/opds/search{?query}"
     
     @classmethod
-    def create_catalog(cls, publications: List[Publication], identifier=""):
-        return create_catalog(
-            title=cls.TITLE,
+    def create_catalog(
+        cls,
+        publications: List[Publication],
+        identifier: str = "",
+        title: Optional[str] = None,
+        pagination: Optional[Paginator] = None
+    ):
+        """Create an OPDS catalog with optional pagination.
+        
+        Args:
+            publications: List of publications to include in the catalog
+            identifier: Optional unique identifier for the catalog
+            title: Optional title for the catalog (defaults to cls.TITLE)
+            pagination: Optional Paginator object for adding pagination links
+            
+        Returns:
+            Catalog object with optional pagination
+        """
+        if title is None:
+            title = cls.TITLE
+            
+        catalog = create_catalog(
+            title=title,
             publications=publications,
             self_link=cls.CATALOG_URL,
             search_link=cls.SEARCH_URL,
             identifier=identifier
         )
+        
+        # Add pagination if provided
+        if pagination is not None:
+            params: dict[str, str] = {}
+            
+            # Add limit to params to preserve it in pagination links
+            if pagination.limit:
+                params["limit"] = str(pagination.limit)
+            
+            # Add sort parameter if provided
+            if pagination.sort:
+                params["sort"] = pagination.sort
+            
+            base_url = cls.SEARCH_URL.replace("{?query}", "")
+            catalog = add_pagination(
+                catalog=catalog,
+                total=pagination.numfound or 0,
+                limit=pagination.limit,
+                offset=pagination.offset,
+                base_url=base_url,
+                params=params
+            )
+        
+        return catalog
 
     @staticmethod
     @abstractmethod
@@ -95,99 +138,3 @@ class DataProvider(ABC):
             List of Publication objects matching the search criteria
         """
         pass
-
-    def search_catalog(
-        self,
-        title: Optional[str] = None,
-        query: str = "",
-        limit: int = 50,
-        offset: int = 0,
-        sort: Optional[str] = None,
-    ) -> Catalog:
-        """
-        Search for publications and return an OPDS Catalog.
-
-        Args:
-            title: Optional title for the catalog
-            query: Search query string
-            limit: Maximum number of results to return (default: 50)
-            offset: Offset for pagination (default: 0)
-            sort: Optional sorting parameter
-        """
-
-        if not title:
-            title = f"Search results for '{query}'"
-        results, total = self.search(
-            query=query,
-            limit=limit,
-            offset=offset,
-            sort=sort,
-        )
-        page = (offset // limit) + 1 if limit else 1
-        publications = [record.to_publication() for record in results]
-        params: dict[str, str] = {}
-        if query:
-            params["query"] = query
-        if limit:
-            params["limit"] = str(limit)
-        if page > 1:
-            params["page"] = str(page)
-        if sort:
-            params["sort"] = sort
-        
-        links: list[Link] = []
-        base_url = self.SEARCH_URL.replace("{?query}", "")
-
-        self_url = base_url + ("?" + urlencode(params) if params else "")
-        links.append(
-            Link(
-                rel="self",
-                href=self_url,
-                type="application/opds+json",
-            )
-        )
-        links.append(
-            Link(
-                rel="first",
-                href=base_url + "?" + urlencode(params | {"page": "1"}),
-                type="application/opds+json",
-            )
-        )
-
-        if page > 1:
-            links.append(
-                Link(
-                    rel="previous",
-                    href=base_url + "?" + urlencode(params | {"page": str(page - 1)}),
-                    type="application/opds+json",
-                )
-            )
-
-        has_more = (offset + limit) < total
-        if has_more:
-            links.append(
-                Link(
-                    rel="next",
-                    href=base_url + "?" + urlencode(params | {"page": str(page + 1)}),
-                    type="application/opds+json",
-                )
-            )
-            last_page = (total + limit - 1) // limit
-            links.append(
-                Link(
-                    rel="last",
-                    href=base_url + "?" + urlencode(params | {"page": str(last_page)}),
-                    type="application/opds+json",
-                )
-            )
-
-        return Catalog(
-            metadata=Metadata(
-                title=title,
-                numberOfItems=total,
-                itemsPerPage=limit,
-                currentPage=page,
-            ),
-            publications=publications,
-            links=links,
-        )

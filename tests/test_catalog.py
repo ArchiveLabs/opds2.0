@@ -6,8 +6,8 @@ from typing import List
 
 import pytest
 
-from opds2.catalog import create_catalog, create_search_catalog
-from opds2.models import Contributor, Link, Metadata, Publication
+from opds2.catalog import create_catalog, create_search_catalog, add_pagination
+from opds2.models import Contributor, Link, Metadata, Publication, Catalog
 from opds2.provider import DataProvider
 
 
@@ -223,3 +223,251 @@ def test_catalog_integration():
     
     assert len(search_data["publications"]) == 1
     assert search_data["publications"][0]["metadata"]["title"] == "The Great Gatsby"
+
+
+def test_add_pagination_basic():
+    """Test adding pagination to a catalog."""
+    # Create a basic catalog
+    catalog = create_catalog(
+        title="Test Catalog",
+        publications=[
+            Publication(
+                metadata=Metadata(title=f"Book {i}"),
+                links=[Link(href=f"https://example.com/book{i}.epub")]
+            )
+            for i in range(10)
+        ]
+    )
+    
+    # Add pagination
+    total = 100
+    limit = 10
+    offset = 0
+    base_url = "https://example.com/search"
+    params = {"query": "test"}
+    
+    paginated_catalog = add_pagination(
+        catalog=catalog,
+        total=total,
+        limit=limit,
+        offset=offset,
+        base_url=base_url,
+        params=params
+    )
+    
+    # Check metadata
+    assert paginated_catalog.metadata.numberOfItems == 100
+    assert paginated_catalog.metadata.itemsPerPage == 10
+    assert paginated_catalog.metadata.currentPage == 1
+    
+    # Check links - should have self, first, next, and last
+    link_rels = [link.rel for link in paginated_catalog.links]
+    assert "self" in link_rels
+    assert "first" in link_rels
+    assert "next" in link_rels
+    assert "last" in link_rels
+    assert "previous" not in link_rels  # Not on first page
+
+
+def test_add_pagination_middle_page():
+    """Test adding pagination for a middle page."""
+    catalog = create_catalog(title="Test Catalog")
+    
+    total = 100
+    limit = 10
+    offset = 20  # Page 3
+    base_url = "https://example.com/search"
+    params = {"query": "test"}
+    
+    paginated_catalog = add_pagination(
+        catalog=catalog,
+        total=total,
+        limit=limit,
+        offset=offset,
+        base_url=base_url,
+        params=params
+    )
+    
+    # Check metadata
+    assert paginated_catalog.metadata.currentPage == 3
+    
+    # Check links - should have all link types
+    link_rels = [link.rel for link in paginated_catalog.links]
+    assert "self" in link_rels
+    assert "first" in link_rels
+    assert "previous" in link_rels
+    assert "next" in link_rels
+    assert "last" in link_rels
+
+
+def test_add_pagination_last_page():
+    """Test adding pagination for the last page."""
+    catalog = create_catalog(title="Test Catalog")
+    
+    total = 100
+    limit = 10
+    offset = 90  # Page 10 (last page)
+    base_url = "https://example.com/search"
+    params = {"query": "test"}
+    
+    paginated_catalog = add_pagination(
+        catalog=catalog,
+        total=total,
+        limit=limit,
+        offset=offset,
+        base_url=base_url,
+        params=params
+    )
+    
+    # Check metadata
+    assert paginated_catalog.metadata.currentPage == 10
+    
+    # Check links - should not have next or last
+    link_rels = [link.rel for link in paginated_catalog.links]
+    assert "self" in link_rels
+    assert "first" in link_rels
+    assert "previous" in link_rels
+    assert "next" not in link_rels
+    assert "last" not in link_rels
+
+
+def test_add_pagination_preserves_existing_links():
+    """Test that add_pagination preserves existing links in the catalog."""
+    catalog = create_catalog(
+        title="Test Catalog",
+        search_link="https://example.com/search?q={searchTerms}"
+    )
+    
+    initial_link_count = len(catalog.links)
+    
+    paginated_catalog = add_pagination(
+        catalog=catalog,
+        total=50,
+        limit=10,
+        offset=0,
+        base_url="https://example.com/results",
+        params={"query": "test"}
+    )
+    
+    # Should have original links plus pagination links
+    assert len(paginated_catalog.links) > initial_link_count
+    
+    # Original search link should still be present
+    search_links = [link for link in paginated_catalog.links if link.rel == "search"]
+    assert len(search_links) == 1
+
+
+def test_add_pagination_url_format():
+    """Test that pagination URLs are correctly formatted."""
+    catalog = create_catalog(title="Test Catalog")
+    
+    total = 100
+    limit = 10
+    offset = 10  # Page 2
+    base_url = "https://example.com/search"
+    params = {"query": "python", "limit": "10"}
+    
+    paginated_catalog = add_pagination(
+        catalog=catalog,
+        total=total,
+        limit=limit,
+        offset=offset,
+        base_url=base_url,
+        params=params
+    )
+    
+    # Check self link contains correct parameters
+    self_link = [link for link in paginated_catalog.links if link.rel == "self"][0]
+    assert "query=python" in self_link.href
+    assert "limit=10" in self_link.href
+    assert "page=2" in self_link.href
+    
+    # Check next link has page=3
+    next_link = [link for link in paginated_catalog.links if link.rel == "next"][0]
+    assert "page=3" in next_link.href
+
+
+def test_paginator_model():
+    """Test Paginator model creation."""
+    from opds2.models import Paginator
+    
+    # Test with defaults
+    paginator = Paginator()
+    assert paginator.limit == 50
+    assert paginator.page == 1
+    assert paginator.offset == 0
+    assert paginator.numfound is None
+    assert paginator.sort is None
+    
+    # Test with custom values
+    paginator = Paginator(
+        limit=10,
+        page=3,
+        offset=20,
+        numfound=100,
+        sort="title"
+    )
+    assert paginator.limit == 10
+    assert paginator.page == 3
+    assert paginator.offset == 20
+    assert paginator.numfound == 100
+    assert paginator.sort == "title"
+
+
+def test_create_catalog_with_pagination():
+    """Test DataProvider.create_catalog with pagination parameter."""
+    from opds2.models import Paginator
+    from opds2.provider import DataProvider, DataProviderRecord
+    
+    class TestRecord(DataProviderRecord):
+        title: str
+        
+        def metadata(self):
+            return Metadata(title=self.title)
+        
+        def links(self):
+            return [Link(href="/test", rel="self")]
+        
+        def images(self):
+            return None
+    
+    class TestProvider(DataProvider):
+        TITLE = "Test Library"
+        CATALOG_URL = "/catalog"
+        SEARCH_URL = "/search{?query}"
+        
+        @staticmethod
+        def search(query, limit=50, offset=0, sort=None):
+            records = [TestRecord(title=f"Book {i}") for i in range(1, 11)]
+            return records, 100
+    
+    # Test without pagination
+    catalog = TestProvider.create_catalog(
+        publications=[Publication(metadata=Metadata(title="Test"), links=[Link(href="/test")])]
+    )
+    assert catalog.metadata.title == "Test Library"
+    assert catalog.metadata.currentPage is None
+    assert catalog.metadata.itemsPerPage is None
+    
+    # Test with pagination
+    catalog_with_pagination = TestProvider.create_catalog(
+        publications=[Publication(metadata=Metadata(title="Test"), links=[Link(href="/test")])],
+        pagination=Paginator(
+            limit=10,
+            offset=20,
+            numfound=100,
+            sort="title"
+        )
+    )
+    
+    assert catalog_with_pagination.metadata.title == "Test Library"
+    assert catalog_with_pagination.metadata.currentPage == 3
+    assert catalog_with_pagination.metadata.itemsPerPage == 10
+    assert catalog_with_pagination.metadata.numberOfItems == 100
+    
+    # Test custom title
+    catalog_custom = TestProvider.create_catalog(
+        publications=[],
+        title="Custom Title"
+    )
+    assert catalog_custom.metadata.title == "Custom Title"
