@@ -97,6 +97,12 @@ class DataProvider(ABC):
         # Add pagination if provided
         if pagination is not None:
             params: dict[str, str] = {}
+            
+            # Add limit to params to preserve it in pagination links
+            if pagination.limit:
+                params["limit"] = str(pagination.limit)
+            
+            # Add sort parameter if provided
             if pagination.sort:
                 params["sort"] = pagination.sort
             
