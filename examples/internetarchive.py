@@ -57,7 +57,7 @@ class InternetArchiveDataRecord(DataProviderRecord):
             author= authors,
             language= self.language,
             description= self.description,
-            published=self.year or None
+            published=self.year if self.year else None
         )
 
 class InternetArchiveDataProvider(DataProvider):
