@@ -16,7 +16,7 @@ class InternetArchiveDataRecord(DataProviderRecord):
     Fields mirror the archive.org advancedsearch response.
     """
     identifier: str = Field(..., description="Internet Archive item identifier (e.g. 'example_item')")
-    title: Optional[str] = Field(..., min_length=1, description="Title of the item")
+    title: str = Field(..., min_length=1, description="Title of the item")
     creator: Optional[List[str]] = Field(None, description="List of creators/authors of the item")
     description: Optional[str] = Field(None, description="Description of the item")
     language: Optional[List[str]]= Field(None, description="Languages of the item")
