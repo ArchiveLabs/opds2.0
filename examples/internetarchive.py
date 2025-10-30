@@ -41,7 +41,7 @@ class InternetArchiveDataRecord(DataProviderRecord):
         
     def images(self) -> Optional[List[Link]]:
         if self.coverurl:
-            return [Link(href= self.coverurl, type="image/jpeg", rel="cover")]
+            return [Link(href=self.coverurl, type="image/jpeg", rel="cover")]
         if self.identifier:
             fallback = f"https://archive.org/download/{self.identifier}/{self.identifier}_thumb.jpg"
             return [Link(href=fallback, type="image/jpeg", rel="cover")]
