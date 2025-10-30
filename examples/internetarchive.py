@@ -19,7 +19,7 @@ class InternetArchiveDataRecord(DataProviderRecord):
     title: str = Field(..., min_length=1, description="Title of the item")
     creator: Optional[List[str]] = Field(None, description="List of creators/authors of the item")
     description: Optional[str] = Field(None, description="Description of the item")
-    language: Optional[List[str]]= Field(None, description="Languages of the item")
+    language: Optional[List[str]] = Field(None, description="Languages of the item")
     mediatype: Optional[str] = Field(None, description="Media type of the item (e.g. 'texts', 'movies')")
     year: Optional[int] = Field(None, description="Year of publication or release")
     coverurl: Optional[str] = Field(None, description="URL to the cover image of the item")
