@@ -1,6 +1,6 @@
 import requests 
 from typing import List, Optional
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from opds2 import (
     DataProvider,
