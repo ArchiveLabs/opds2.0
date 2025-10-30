@@ -71,9 +71,9 @@ class InternetArchiveDataProvider(DataProvider):
     
     @staticmethod
     def search(
-        query : str,
-        limit : int = 50,
-        offset : int = 0
+        query: str,
+        limit: int = 50,
+        offset: int = 0
         ) -> tuple[List[InternetArchiveDataRecord],int]:
         """Use the archive.org advancedsearch endpoint to find items.
         Returns a tuple (records, total_hits).
