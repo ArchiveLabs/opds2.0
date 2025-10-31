@@ -91,9 +91,12 @@ class DataProvider(ABC):
     """
     
     TITLE: str = "Generic OPDS Service"
-    URL: str = "http://localhost/"
-    CATALOG_URL: str = "/opds/catalog"
+
+    BASE_URL: str = "http://localhost"
+    """The base url for the data provider."""
+
     SEARCH_URL: str = "/opds/search{?query}"
+    """The relative url template for search queries."""
     
     @staticmethod
     @abstractmethod
