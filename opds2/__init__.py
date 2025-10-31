@@ -6,7 +6,6 @@ Based on the OPDS 2.0 specification at https://drafts.opds.io/opds-2.0
 
 __version__ = "0.1.0"
 
-from opds2.catalog import create_catalog, create_search_catalog
 from opds2.models import (
     Catalog,
     Contributor,
@@ -15,11 +14,9 @@ from opds2.models import (
     Navigation,
     Publication,
 )
-from opds2.provider import DataProvider, DataProviderRecord
+from opds2.provider import DataProvider, DataProviderRecord, SearchRequest, SearchResponse
 
 __all__ = [
-    "create_catalog",
-    "create_search_catalog",
     "Catalog",
     "Contributor",
     "DataProvider",
@@ -28,4 +25,6 @@ __all__ = [
     "Metadata",
     "Navigation",
     "Publication",
+    "SearchRequest",
+    "SearchResponse",
 ]

@@ -5,7 +5,9 @@ Based on the OPDS 2.0 specification and Web Publication Manifest.
 
 from datetime import datetime
 from typing import Any, Dict, List, Optional
+from urllib.parse import urlencode
 
+from opds2 import DataProvider, SearchResponse
 from pydantic import BaseModel, Field # field_validator
 
 
@@ -140,3 +142,97 @@ class Catalog(BaseModel):
         # Use model_dump to get the dict with @context, then serialize to JSON
         data = self.model_dump(**kwargs)
         return json.dumps(data, default=str)
+
+    @staticmethod
+    def create(
+        provider: DataProvider,
+
+        # Catalog properties
+        metadata: Metadata | None = None,
+        links: list[Link] | None = None,
+        publications: list[Publication] | None = None,
+        navigation: list[Navigation] | None = None,
+        groups: list['Catalog'] | None = None,
+        facets: list[dict[str, Any]] | None = None,
+        search: SearchResponse | None = None,
+    ) -> 'Catalog':
+        """
+        Search for publications and return an OPDS Catalog.
+
+        Args:
+            search: SearchResponse from DataProvider to convert to publication/etc.
+        """
+
+        metadata = metadata or Metadata()
+        links = links or []
+
+        if search:
+            req = search.request
+            if publications:
+                raise ValueError("Unexpected publication with query")
+
+            publications = [record.to_publication() for record in search.records]
+            params: dict[str, str] = {}
+            if req.query:
+                params["query"] = req.query
+            if req.limit:
+                params["limit"] = str(req.limit)
+            if search.page > 1:
+                params["page"] = str(search.page)
+            if req.sort:
+                params["sort"] = req.sort
+
+            metadata.numberOfItems = search.total
+            metadata.itemsPerPage = req.limit
+            metadata.currentPage = search.page
+
+            base_url = provider.SEARCH_URL.replace("{?query}", "")
+            self_url = base_url + ("?" + urlencode(params) if params else "")
+            links.append(
+                Link(
+                    rel="self",
+                    href=self_url,
+                    type="application/opds+json",
+                )
+            )
+            links.append(
+                Link(
+                    rel="first",
+                    href=base_url + "?" + urlencode(params | {"page": "1"}),
+                    type="application/opds+json",
+                )
+            )
+
+            if search.page > 1:
+                links.append(
+                    Link(
+                        rel="previous",
+                        href=base_url + "?" + urlencode(params | {"page": str(search.page - 1)}),
+                        type="application/opds+json",
+                    )
+                )
+
+            if search.has_more:
+                links.append(
+                    Link(
+                        rel="next",
+                        href=base_url + "?" + urlencode(params | {"page": str(search.page + 1)}),
+                        type="application/opds+json",
+                    )
+                )
+                links.append(
+                    Link(
+                        rel="last",
+                        href=base_url + "?" + urlencode(params | {"page": str(search.last_page)}),
+                        type="application/opds+json",
+                    )
+                )
+
+        return Catalog(
+            metadata=metadata,
+            links=links,
+            publications=publications,
+            navigation=navigation,
+            groups=groups,
+            facets=facets,
+        )

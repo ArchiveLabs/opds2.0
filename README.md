@@ -27,26 +27,24 @@ To use this library, you must implement two key classes:
 ### Example
 
 ```python
-from opds2 import DataProvider, DataProviderRecord, Metadata, Link
+from opds2 import Catalog, DataProvider, DataProviderRecord, Metadata, Link, SearchResponse
 
 class MyRecord(DataProviderRecord):
-		def metadata(self):
-				return Metadata(title="Example Book")
-		def links(self):
-				return [Link(href="/books/1", rel="self", type="application/epub+zip")]
-		def images(self):
-				return None
+    def metadata(self):
+        return Metadata(title="Example Book")
+    def links(self):
+        return [Link(href="/books/1", rel="self", type="application/epub+zip")]
+    def images(self):
+            return None
 
 class MyProvider(DataProvider):
-		@staticmethod
-		def search(query, limit=50, offset=0):
-				# Return a list of MyRecord instances and total count
-				records = [MyRecord()]
-				return records, len(records)
+    @staticmethod
+    def search(query, limit=50, offset=0, sort=None):
+        records = [MyRecord()]
+        # Return a list of MyRecord instances and total count
+        return SearchResponse(records, len(records), SearchRequest(query, limit, offset, sort))
 
-# Create a catalog
-from opds2.catalog import create_catalog
-catalog = MyProvider.create_catalog([r.to_publication() for r in records])
+catalog = Catalog.create(MyProvider, search=MyProvider.search("example"))
 print(catalog.model_dump_json(indent=2))
 ```
 
@@ -66,8 +64,8 @@ See `examples/openlibrary.py` for a real-world integration with OpenLibrary.
 
 #### Catalog Functions
 
-- **`create_catalog()`**: Create a basic catalog with optional search
-- **`create_search_catalog()`**: Create a catalog from search results
+- **`Catalog()`**: Create a basic catalog
+- **`Catalog.create()`**: Run a search and create a paginated Catalog from the search results
 
 ## Similar Implementations
 
