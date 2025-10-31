@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlencode
 
-from opds2 import DataProvider
+from opds2 import DataProvider, SearchResponse
 from pydantic import BaseModel, Field # field_validator
 
 
@@ -154,52 +154,37 @@ class Catalog(BaseModel):
         navigation: list[Navigation] | None = None,
         groups: list['Catalog'] | None = None,
         facets: list[dict[str, Any]] | None = None,
-
-        # Search parameters - TODO take in search result instead
-        query: str = "",
-        limit: int = 50,
-        offset: int = 0,
-        sort: Optional[str] = None,
+        search: SearchResponse | None = None,
     ) -> 'Catalog':
         """
         Search for publications and return an OPDS Catalog.
 
         Args:
-            title: Optional title for the catalog
-            query: Search query string
-            limit: Maximum number of results to return (default: 50)
-            offset: Offset for pagination (default: 0)
-            sort: Optional sorting parameter
+            search: SearchResponse from DataProvider to convert to publication/etc.
         """
 
         metadata = metadata or Metadata()
         links = links or []
 
-        if query:
+        if search:
+            req = search.request
             if publications:
                 raise ValueError("Unexpected publication with query")
 
-            results, total = provider.search(
-                query=query,
-                limit=limit,
-                offset=offset,
-                sort=sort,
-            )
-            page = (offset // limit) + 1 if limit else 1
-            publications = [record.to_publication() for record in results]
+            publications = [record.to_publication() for record in search.records]
             params: dict[str, str] = {}
-            if query:
-                params["query"] = query
-            if limit:
-                params["limit"] = str(limit)
-            if page > 1:
-                params["page"] = str(page)
-            if sort:
-                params["sort"] = sort
-            
-            metadata.numberOfItems = total
-            metadata.itemsPerPage = limit
-            metadata.currentPage = page
+            if req.query:
+                params["query"] = req.query
+            if req.limit:
+                params["limit"] = str(req.limit)
+            if search.page > 1:
+                params["page"] = str(search.page)
+            if req.sort:
+                params["sort"] = req.sort
+
+            metadata.numberOfItems = search.total
+            metadata.itemsPerPage = req.limit
+            metadata.currentPage = search.page
 
             base_url = provider.SEARCH_URL.replace("{?query}", "")
             self_url = base_url + ("?" + urlencode(params) if params else "")
@@ -218,29 +203,27 @@ class Catalog(BaseModel):
                 )
             )
 
-            if page > 1:
+            if search.page > 1:
                 links.append(
                     Link(
                         rel="previous",
-                        href=base_url + "?" + urlencode(params | {"page": str(page - 1)}),
+                        href=base_url + "?" + urlencode(params | {"page": str(search.page - 1)}),
                         type="application/opds+json",
                     )
                 )
 
-            has_more = (offset + limit) < total
-            if has_more:
+            if search.has_more:
                 links.append(
                     Link(
                         rel="next",
-                        href=base_url + "?" + urlencode(params | {"page": str(page + 1)}),
+                        href=base_url + "?" + urlencode(params | {"page": str(search.page + 1)}),
                         type="application/opds+json",
                     )
                 )
-                last_page = (total + limit - 1) // limit
                 links.append(
                     Link(
                         rel="last",
-                        href=base_url + "?" + urlencode(params | {"page": str(last_page)}),
+                        href=base_url + "?" + urlencode(params | {"page": str(search.last_page)}),
                         type="application/opds+json",
                     )
                 )

@@ -27,24 +27,24 @@ To use this library, you must implement two key classes:
 ### Example
 
 ```python
-from opds2 import Catalog, DataProvider, DataProviderRecord, Metadata, Link
+from opds2 import Catalog, DataProvider, DataProviderRecord, Metadata, Link, SearchResponse
 
 class MyRecord(DataProviderRecord):
-		def metadata(self):
-				return Metadata(title="Example Book")
-		def links(self):
-				return [Link(href="/books/1", rel="self", type="application/epub+zip")]
-		def images(self):
-				return None
+    def metadata(self):
+        return Metadata(title="Example Book")
+    def links(self):
+        return [Link(href="/books/1", rel="self", type="application/epub+zip")]
+    def images(self):
+            return None
 
 class MyProvider(DataProvider):
-		@staticmethod
-		def search(query, limit=50, offset=0):
-				# Return a list of MyRecord instances and total count
-				records = [MyRecord()]
-				return records, len(records)
+    @staticmethod
+    def search(query, limit=50, offset=0, sort=None):
+        records = [MyRecord()]
+        # Return a list of MyRecord instances and total count
+        return SearchResponse(records, len(records), SearchRequest(query, limit, offset, sort))
 
-catalog = Catalog.create(MyProvider, query='')
+catalog = Catalog.create(MyProvider, search=MyProvider.search("example"))
 print(catalog.model_dump_json(indent=2))
 ```
 
