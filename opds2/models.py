@@ -4,11 +4,14 @@ Based on the OPDS 2.0 specification and Web Publication Manifest.
 """
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 from urllib.parse import urlencode
 
-from opds2 import DataProvider, SearchResponse
 from pydantic import BaseModel, Field # field_validator
+
+
+if TYPE_CHECKING:
+    from opds2 import DataProvider, SearchResponse
 
 
 class Link(BaseModel):
