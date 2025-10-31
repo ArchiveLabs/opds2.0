@@ -4,9 +4,7 @@ import json
 from datetime import datetime
 from typing import List
 
-import pytest
-
-from opds2.catalog import create_catalog, create_search_catalog
+from opds2 import Catalog
 from opds2.models import Contributor, Link, Metadata, Publication
 from opds2.provider import DataProvider
 
@@ -109,7 +107,7 @@ def test_data_provider_search_pagination():
 
 def test_create_catalog_basic():
     """Test creating a basic catalog."""
-    catalog = create_catalog(title="My Library")
+    catalog = Catalog.create(metadata=Metadata(title="My Library"))
     
     assert catalog.metadata.title == "My Library"
     assert catalog.publications == []
@@ -122,8 +120,8 @@ def test_create_catalog_with_publications():
         links=[Link(href="https://example.com/book.epub")]
     )
     
-    catalog = create_catalog(
-        title="My Catalog",
+    catalog = Catalog.create(
+        metadata=Metadata(title="My Catalog"),
         publications=[pub],
         self_link="https://example.com/catalog"
     )

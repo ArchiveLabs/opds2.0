@@ -27,7 +27,7 @@ To use this library, you must implement two key classes:
 ### Example
 
 ```python
-from opds2 import DataProvider, DataProviderRecord, Metadata, Link
+from opds2 import Catalog, DataProvider, DataProviderRecord, Metadata, Link
 
 class MyRecord(DataProviderRecord):
 		def metadata(self):
@@ -44,9 +44,7 @@ class MyProvider(DataProvider):
 				records = [MyRecord()]
 				return records, len(records)
 
-# Create a catalog
-from opds2.catalog import create_catalog
-catalog = MyProvider.create_catalog([r.to_publication() for r in records])
+catalog = Catalog.create(MyProvider, query='')
 print(catalog.model_dump_json(indent=2))
 ```
 
@@ -66,8 +64,8 @@ See `examples/openlibrary.py` for a real-world integration with OpenLibrary.
 
 #### Catalog Functions
 
-- **`create_catalog()`**: Create a basic catalog with optional search
-- **`create_search_catalog()`**: Create a catalog from search results
+- **`Catalog()`**: Create a basic catalog
+- **`Catalog.create()`**: Run a search and create a paginated Catalog from the search results
 
 ## Similar Implementations
 
