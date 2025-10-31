@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field # field_validator
 
 
 if TYPE_CHECKING:
-    from opds2 import DataProvider, SearchResponse
+    from opds2.provider import DataProvider, SearchResponse
 
 
 class Link(BaseModel):
@@ -148,7 +148,7 @@ class Catalog(BaseModel):
 
     @staticmethod
     def create(
-        provider: DataProvider,
+        provider: 'DataProvider',
 
         # Catalog properties
         metadata: Metadata | None = None,
@@ -157,7 +157,7 @@ class Catalog(BaseModel):
         navigation: list[Navigation] | None = None,
         groups: list['Catalog'] | None = None,
         facets: list[dict[str, Any]] | None = None,
-        search: SearchResponse | None = None,
+        search: 'SearchResponse | None' = None,
     ) -> 'Catalog':
         """
         Search for publications and return an OPDS Catalog.
