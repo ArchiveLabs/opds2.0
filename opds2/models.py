@@ -190,7 +190,7 @@ class Catalog(BaseModel):
 
             base_url = data.provider.SEARCH_URL.replace("{?query}", "")
             if base_url.startswith("/"):
-                base_url = provider.BASE_URL.rstrip('/') + base_url
+                base_url = data.provider.BASE_URL.rstrip('/') + base_url
 
             self_url = base_url + ("?" + urlencode(params) if params else "")
             links.append(
