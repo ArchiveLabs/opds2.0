@@ -160,9 +160,6 @@ class Catalog(BaseModel):
     ) -> 'Catalog':
         """
         Search for publications and return an OPDS Catalog.
-
-        Args:
-            search: SearchResponse from DataProvider to convert to publication/etc.
         """
 
         metadata = metadata or Metadata()
@@ -217,18 +214,18 @@ class Catalog(BaseModel):
                     )
                 )
 
-            if search.has_more:
+            if data.has_more:
                 links.append(
                     Link(
                         rel="next",
-                        href=base_url + "?" + urlencode(params | {"page": str(search.page + 1)}),
+                        href=base_url + "?" + urlencode(params | {"page": str(data.page + 1)}),
                         type="application/opds+json",
                     )
                 )
                 links.append(
                     Link(
                         rel="last",
-                        href=base_url + "?" + urlencode(params | {"page": str(search.last_page)}),
+                        href=base_url + "?" + urlencode(params | {"page": str(data.last_page)}),
                         type="application/opds+json",
                     )
                 )
