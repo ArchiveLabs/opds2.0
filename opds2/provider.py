@@ -43,39 +43,6 @@ class DataProviderRecord(BaseModel, ABC):
             images=self.images()
         )
 
-
-@dataclass
-class SearchRequest:
-    """Request parameters for a search query."""
-    query: str
-    limit: int = 50
-    offset: int = 0
-    sort: Optional[str] = None
-
-
-@dataclass
-class SearchResponse:
-    """Response from a search query."""
-    records: List[DataProviderRecord]
-    total: int
-    request: SearchRequest
-
-    @property
-    def page(self) -> int:
-        """Calculate current page number based on offset and limit."""
-        return (self.request.offset // self.request.limit) + 1 if self.request.limit else 1
-    
-    @property
-    def last_page(self) -> int:
-        """Calculate last page number based on total and limit."""
-        return (self.total + self.request.limit - 1) // self.request.limit
-
-    @property
-    def has_more(self) -> bool:
-        """Determine if there are more results beyond the current page."""
-        req = self.request
-        return (req.offset + req.limit) < self.total
-
 class DataProvider(ABC):
     """Abstract base class for OPDS 2.0 data providers.
     
@@ -97,6 +64,38 @@ class DataProvider(ABC):
 
     SEARCH_URL: str = "/opds/search{?query}"
     """The relative url template for search queries."""
+
+    @dataclass
+    class SearchRequest:
+        """Request parameters for a search query."""
+        query: str
+        limit: int = 50
+        offset: int = 0
+        sort: Optional[str] = None
+    
+    @dataclass
+    class SearchResponse:
+        """Response from a search query."""
+        provider: DataProvider
+        records: List[DataProviderRecord]
+        total: int
+        request: SearchRequest
+    
+        @property
+        def page(self) -> int:
+            """Calculate current page number based on offset and limit."""
+            return (self.request.offset // self.request.limit) + 1 if self.request.limit else 1
+        
+        @property
+        def last_page(self) -> int:
+            """Calculate last page number based on total and limit."""
+            return (self.total + self.request.limit - 1) // self.request.limit
+    
+        @property
+        def has_more(self) -> bool:
+            """Determine if there are more results beyond the current page."""
+            req = self.request
+            return (req.offset + req.limit) < self.total
     
     @staticmethod
     @abstractmethod
@@ -105,7 +104,7 @@ class DataProvider(ABC):
         limit: int = 50,
         offset: int = 0,
         sort: Optional[str] = None,
-    ) -> SearchResponse:
+    ) -> DataRecord.SearchResponse:
         """Search for publications matching the query.
         
         Args:
