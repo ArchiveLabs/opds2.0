@@ -5,6 +5,7 @@ Data providers implement the logic for searching and retrieving publications.
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+import functools
 from typing import List, Optional
 
 from pydantic import BaseModel
@@ -66,26 +67,40 @@ class DataProvider(ABC):
     """The relative url template for search queries."""
 
     @dataclass
-    class SearchRequest:
-        """Request parameters for a search query."""
+    class SearchResponse:
+        """Response from a search query."""
+        provider: 'DataProvider'
         query: str
         limit: int = 50
         offset: int = 0
         sort: Optional[str] = None
-    
-    @dataclass
-    class SearchResponse:
-        """Response from a search query."""
-        provider: 'DataProvider'
         records: List[DataProviderRecord]
         total: int
-        request: 'DataProvider.SearchRequest'
-    
+
+        def get_base_search_url(self, **kwargs) -> str:
+            base_url = self.provider.SEARCH_URL.replace("{?query}", "")
+            if base_url.startswith("/"):
+                base_url = self.provider.BASE_URL.rstrip('/') + base_url
+            return f"{base_url}{urlencode(self.params | kwargs})"
+
+        @functools.cached_property
+        def params(self) -> dict:
+            p: dict[str, str] = {}
+            if response.query:
+                p["query"] = self.query
+            if response.limit:
+                p["limit"] = str(self.limit)
+            if response.page > 1:
+                p["page"] = str(response.page)
+            if response.sort:
+                p["sort"] = response.sort
+            return p
+
         @property
         def page(self) -> int:
             """Calculate current page number based on offset and limit."""
-            return (self.request.offset // self.request.limit) + 1 if self.request.limit else 1
-        
+            return (self.offset // self.limit) + 1 if self.limit else 1
+ 
         @property
         def last_page(self) -> int:
             """Calculate last page number based on total and limit."""
@@ -96,10 +111,10 @@ class DataProvider(ABC):
             """Determine if there are more results beyond the current page."""
             req = self.request
             return (req.offset + req.limit) < self.total
-    
+
+    @staticmethod
     @abstractmethod
     def search(
-        self,
         query: str,
         limit: int = 50,
         offset: int = 0,

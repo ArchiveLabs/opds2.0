@@ -117,7 +117,6 @@ class Catalog(BaseModel):
 
     model_config = {"extra": "allow"}
 
-    #@field_validator("links", mode="before")
     @classmethod
     def ensure_self_link(cls, v: List[Link]) -> List[Link]:
         """Ensure there's at least a structure for links."""
@@ -145,10 +144,57 @@ class Catalog(BaseModel):
         # Use model_dump to get the dict with @context, then serialize to JSON
         data = self.model_dump(**kwargs)
         return json.dumps(data, default=str)
+    
+    def paginate(self, response: 'DataProvider.SearchResponse'):
 
-    @staticmethod
+        self.metadata.numberOfItems = response.total
+        self.metadata.itemsPerPage = response.limit
+        self.metadata.currentPage = response.page
+
+        self.links.append(
+            Link(
+                rel="self",
+                href=response.base_search_url,
+                type="application/opds+json",
+            )
+        )
+        links.append(
+            Link(
+                rel="first",
+                href=response.get_base_search_url(page=1),
+                type="application/opds+json",
+            )
+        )
+
+        if data.page > 1:
+            links.append(
+                Link(
+                    rel="previous",
+                    href=base_url + "?" + urlencode(params | {"page": str(data.page - 1)}),
+                    type="application/opds+json",
+                )
+            )
+
+        if data.has_more:
+            links.append(
+                Link(
+                    rel="next",
+                    href=base_url + "?" + urlencode(params | {"page": str(data.page + 1)}),
+                    type="application/opds+json",
+                )
+            )
+            links.append(
+                Link(
+                    rel="last",
+                    href=base_url + "?" + urlencode(params | {"page": str(data.last_page)}),
+                    type="application/opds+json",
+                )
+            )
+
+    @classmethod
     def create(
-        data: Optional['DataProvider.SearchResponse'] = None,
+        cls, 
+        response: Optional['DataProvider.SearchResponse'] = None,
         paginate: bool = True,
         # Catalog properties
         metadata: Optional[Metadata] = None,
@@ -157,9 +203,6 @@ class Catalog(BaseModel):
         navigation: Optional[List[Navigation]] = None,
         groups: Optional[List['Catalog']] = None,
         facets: Optional[List[Dict[str, Any]]] = None,
-        # Backward compatibility
-        self_link: Optional[str] = None,
-        search_link: Optional[str] = None,
     ) -> 'Catalog':
         """
         Create an OPDS Catalog, optionally from search results.
@@ -167,108 +210,18 @@ class Catalog(BaseModel):
         Args:
             data: Optional SearchResponse for paginated search results
             paginate: Whether to add pagination links (requires data)
-            metadata: Catalog metadata
-            links: Additional links
-            publications: Publications to include (cannot be used with paginate=True)
-            navigation: Navigation items
-            groups: Grouped collections
-            facets: Faceting information
-            self_link: Convenience parameter to add a self link
-            search_link: Convenience parameter to add a search link
         """
-
         metadata = metadata or Metadata()
         links = links or []
-        
-        # Add self link if provided
-        if self_link:
-            links.append(
-                Link(
-                    rel="self",
-                    href=self_link,
-                    type="application/opds+json",
-                )
-            )
-        
-        # Add search link if provided
-        if search_link:
-            links.append(
-                Link(
-                    rel="search",
-                    href=search_link,
-                    type="application/opds+json",
-                    templated="{" in search_link,  # Auto-detect if templated
-                )
-            )
+        publications = publications or []
 
-        if data and paginate:
-            req = data.request
+        if response:
             if publications:
                 raise ValueError("Unexpected publication with query")
-
-            publications = [record.to_publication() for record in data.records]
-            params: dict[str, str] = {}
-            if req.query:
-                params["query"] = req.query
-            if req.limit:
-                params["limit"] = str(req.limit)
-            if data.page > 1:
-                params["page"] = str(data.page)
-            if req.sort:
-                params["sort"] = req.sort
-
-            metadata.numberOfItems = data.total
-            metadata.itemsPerPage = req.limit
-            metadata.currentPage = data.page
-
-            base_url = data.provider.SEARCH_URL.replace("{?query}", "")
-            if base_url.startswith("/"):
-                base_url = data.provider.BASE_URL.rstrip('/') + base_url
-
-            self_url = base_url + ("?" + urlencode(params) if params else "")
-            links.append(
-                Link(
-                    rel="self",
-                    href=self_url,
-                    type="application/opds+json",
-                )
-            )
-            links.append(
-                Link(
-                    rel="first",
-                    href=base_url + "?" + urlencode(params | {"page": "1"}),
-                    type="application/opds+json",
-                )
-            )
-
-            if data.page > 1:
-                links.append(
-                    Link(
-                        rel="previous",
-                        href=base_url + "?" + urlencode(params | {"page": str(data.page - 1)}),
-                        type="application/opds+json",
-                    )
-                )
-
-            if data.has_more:
-                links.append(
-                    Link(
-                        rel="next",
-                        href=base_url + "?" + urlencode(params | {"page": str(data.page + 1)}),
-                        type="application/opds+json",
-                    )
-                )
-                links.append(
-                    Link(
-                        rel="last",
-                        href=base_url + "?" + urlencode(params | {"page": str(data.last_page)}),
-                        type="application/opds+json",
-                    )
-                )
-
-        # Ensure publications is at least an empty list, not None
-        if publications is None:
-            publications = []
+            publications = [record.to_publication() for record in response.records]
+        
+            if paginate:                
+                links += cls.add_pagination(response)
 
         return Catalog(
             metadata=metadata,
