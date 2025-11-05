@@ -27,7 +27,7 @@ To use this library, you must implement two key classes:
 ### Example
 
 ```python
-from pyopds2 import Catalog, DataProvider, DataProviderRecord, Metadata, Link, SearchResponse
+from pyopds2 import Catalog, DataProvider, DataProviderRecord, Metadata, Link
 
 class MyRecord(DataProviderRecord):
     def metadata(self):
@@ -44,7 +44,7 @@ class MyProvider(DataProvider):
         # Return a list of MyRecord instances and total count
         return SearchResponse(records, len(records), query, limit, offset, sort)
 
-catalog = Catalog.create(MyProvider, search=MyProvider.search("example"))
+catalog = Catalog.create(MyProvider.search("example"))
 print(catalog.model_dump_json(indent=2))
 ```
 
