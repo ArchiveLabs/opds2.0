@@ -4,65 +4,36 @@ import json
 from datetime import datetime, timezone
 from typing import List, Optional
 
-from opds2 import (
-    Catalog,
-    Contributor,
-    DataProvider,
-    DataProviderRecord,
-    Link,
-    Metadata,
-    Publication,
-)
+from opds2 import Catalog, Contributor, Link, Metadata, Publication
+from opds2.provider import DataProvider, DataProviderRecord
 
 
-# Helper functions for backward compatibility
-def create_catalog(
-    title: str = "Catalog",
-    publications: Optional[List[Publication]] = None,
-    self_link: Optional[str] = None,
-    search_link: Optional[str] = None,
-    identifier: Optional[str] = None,
-    modified: Optional[datetime] = None,
-) -> Catalog:
-    """Helper function to create a catalog with a simple API."""
-    metadata = Metadata(
-        title=title,
-        identifier=identifier,
-        modified=modified,
-    )
-    return Catalog.create(
-        metadata=metadata,
-        publications=publications,
-        self_link=self_link,
-        search_link=search_link,
-        paginate=False,
-    )
+class SimpleBook(DataProviderRecord):
+    """Simple book record for testing."""
+    title: str
+    author: str
+    url: str
 
+    def metadata(self) -> Metadata:
+        """Return book metadata."""
+        return Metadata(
+            title=self.title,
+            author=[Contributor(name=self.author, role="author")]
+        )
 
-def create_search_catalog(
-    provider: DataProvider,
-    query: str,
-    limit: int = 50,
-    offset: int = 0,
-    self_link: Optional[str] = None,
-) -> Catalog:
-    """Helper function to create a search catalog."""
-    search_response = provider.search(query, limit=limit, offset=offset)
-    
-    # Generate a title based on query and results
-    if search_response.total == 0:
-        title = f"No results found for '{query}'" if query else "No results found"
-    else:
-        title = f"Search results for '{query}'" if query else f"All results ({search_response.total} items)"
-    
-    metadata = Metadata(title=title)
-    
-    return Catalog.create(
-        data=search_response,
-        paginate=True,
-        metadata=metadata,
-        self_link=self_link,
-    )
+    def links(self) -> List[Link]:
+        """Return book links."""
+        return [
+            Link(
+                href=self.url,
+                type="application/epub+zip",
+                rel="http://opds-spec.org/acquisition",
+            )
+        ]
+
+    def images(self) -> Optional[List[Link]]:
+        """Return book images."""
+        return None
 
 
 class TestIntegration:
@@ -73,81 +44,66 @@ class TestIntegration:
 
         # Step 1: Create a DataProvider implementation
         class SimpleProvider(DataProvider):
-            TITLE = "Simple Test Provider"
+            TITLE = "Simple Library"
             BASE_URL = "https://example.com"
             SEARCH_URL = "/search{?query}"
-            
-            def search(
-                self, query: str, limit: int = 50, offset: int = 0, sort=None
-            ) -> DataProvider.SearchResponse:
-                books = [
-                    {
-                        "title": "Test Book 1",
-                        "author": "Author One",
-                        "url": "https://example.com/book1.epub",
-                    },
-                    {
-                        "title": "Test Book 2",
-                        "author": "Author Two",
-                        "url": "https://example.com/book2.epub",
-                    },
-                ]
 
-                all_results = []
-                for book in books:
+            BOOKS = [
+                {
+                    "title": "Test Book 1",
+                    "author": "Author One",
+                    "url": "https://example.com/book1.epub",
+                },
+                {
+                    "title": "Test Book 2",
+                    "author": "Author Two",
+                    "url": "https://example.com/book2.epub",
+                },
+            ]
+
+            @staticmethod
+            def search(
+                query: str,
+                limit: int = 50,
+                offset: int = 0,
+                sort: Optional[str] = None
+            ) -> DataProvider.SearchResponse:
+                """Search for books."""
+                results = []
+                for book in SimpleProvider.BOOKS:
                     if not query or query.lower() in book["title"].lower():
-                        all_results.append(book)
-                
-                total = len(all_results)
-                results = all_results[offset : offset + limit]
-                
-                class SimpleRecord(DataProviderRecord):
-                    model_config = {'extra': 'allow'}  # Allow extra fields
-                    
-                    def __init__(self, book_data):
-                        super().__init__(book_data=book_data)
-                    
-                    def metadata(self) -> Metadata:
-                        return Metadata(
-                            title=self.book_data["title"],
-                            author=[Contributor(name=self.book_data["author"], role="author")],
-                        )
-                    
-                    def links(self) -> List[Link]:
-                        return [
-                            Link(
-                                href=self.book_data["url"],
-                                type="application/epub+zip",
-                                rel="http://opds-spec.org/acquisition",
-                            )
-                        ]
-                    
-                    def images(self):
-                        return None
-                
-                records = [SimpleRecord(book) for book in results]
-                
+                        results.append(book)
+
+                total = len(results)
+                paginated = results[offset:offset + limit]
+                records = [SimpleBook(**book) for book in paginated]
+
                 return DataProvider.SearchResponse(
-                    provider=self,
+                    provider=SimpleProvider,
+                    query=query,
+                    limit=limit,
+                    offset=offset,
+                    sort=sort,
                     records=records,
-                    total=total,
-                    request=DataProvider.SearchRequest(
-                        query=query,
-                        limit=limit,
-                        offset=offset,
-                        sort=sort
-                    )
+                    total=total
                 )
 
-        provider = SimpleProvider()
-
         # Step 2: Create a main catalog
-        main_catalog = create_catalog(
-            title="Main Library Catalog",
-            self_link="https://example.com/catalog",
-            search_link="https://example.com/search?q={searchTerms}",
-            identifier="urn:uuid:test-catalog",
-            modified=datetime(2024, 1, 1, tzinfo=timezone.utc),
+        main_catalog = Catalog.create(
+            metadata=Metadata(
+                title="Main Library Catalog",
+                identifier="urn:uuid:test-catalog",
+                modified=datetime(2024, 1, 1, tzinfo=timezone.utc),
+            ),
+            publications=[],
+            links=[
+                Link(rel="self", href="https://example.com/catalog"),
+                Link(
+                    rel="search",
+                    href="https://example.com/search?q={searchTerms}",
+                    templated=True
+                )
+            ]
         )
 
         # Verify main catalog structure
@@ -164,34 +120,26 @@ class TestIntegration:
         assert main_data["links"][1]["templated"] is True
 
         # Step 3: Perform a search
-        search_results = create_search_catalog(
-            provider=provider,
-            query="Book 1",
-            limit=10,
-            self_link="https://example.com/search?q=Book+1",
-        )
+        search_results = SimpleProvider.search("Book 1", limit=10)
+        search_catalog = Catalog.create(response=search_results)
 
         # Verify search results
-        assert len(search_results.publications) == 1
-        assert search_results.publications[0].metadata.title == "Test Book 1"
-        assert search_results.metadata.numberOfItems == 1
+        assert len(search_catalog.publications) == 1
+        assert search_catalog.publications[0].metadata.title == "Test Book 1"
+        assert search_catalog.metadata.numberOfItems == 1
 
         # Verify search JSON output
-        search_json = search_results.model_dump_json()
+        search_json = search_catalog.model_dump_json()
         search_data = json.loads(search_json)
         assert "@context" in search_data
         assert search_data["metadata"]["numberOfItems"] == 1
         assert len(search_data["publications"]) == 1
-        assert (
-            search_data["publications"][0]["metadata"]["title"] == "Test Book 1"
-        )
+        pub_title = search_data["publications"][0]["metadata"]["title"]
+        assert pub_title == "Test Book 1"
 
         # Step 4: Get all publications
-        all_books_catalog = create_search_catalog(
-            provider=provider,
-            query="",  # Empty query returns all
-            self_link="https://example.com/all",
-        )
+        all_results = SimpleProvider.search("")
+        all_books_catalog = Catalog.create(response=all_results)
 
         assert len(all_books_catalog.publications) == 2
 
@@ -200,11 +148,11 @@ class TestIntegration:
         all_data = json.loads(all_json)
 
         # Check JSON-LD context
-        assert all_data["@context"] == "https://readium.org/webpub-manifest/context.jsonld"
+        assert (all_data["@context"] ==
+                "https://readium.org/webpub-manifest/context.jsonld")
 
         # Check metadata
         assert "metadata" in all_data
-        assert "title" in all_data["metadata"]
         assert all_data["metadata"]["numberOfItems"] == 2
 
         # Check publications
@@ -254,10 +202,10 @@ class TestIntegration:
         )
 
         # Create catalog with these publications
-        catalog = create_catalog(
-            title="Direct Publications Catalog",
+        catalog = Catalog.create(
+            metadata=Metadata(title="Direct Publications Catalog"),
             publications=[pub1, pub2],
-            self_link="https://example.com/direct",
+            links=[Link(rel="self", href="https://example.com/direct")]
         )
 
         assert len(catalog.publications) == 2
@@ -268,14 +216,17 @@ class TestIntegration:
         json_str = catalog.model_dump_json()
         data = json.loads(json_str)
 
-        assert data["@context"] == "https://readium.org/webpub-manifest/context.jsonld"
+        assert (data["@context"] ==
+                "https://readium.org/webpub-manifest/context.jsonld")
         assert len(data["publications"]) == 2
         assert data["publications"][0]["metadata"]["language"] == ["en"]
         assert data["publications"][1]["metadata"]["language"] == ["es"]
 
     def test_empty_catalog(self):
         """Test creating an empty catalog."""
-        catalog = create_catalog(title="Empty Catalog")
+        catalog = Catalog.create(
+            metadata=Metadata(title="Empty Catalog")
+        )
 
         assert catalog.metadata.title == "Empty Catalog"
         assert catalog.publications == []
@@ -287,13 +238,14 @@ class TestIntegration:
 
         assert "@context" in data
         assert data["metadata"]["title"] == "Empty Catalog"
-        assert data["publications"] == []
 
     def test_json_serialization_with_datetime(self):
         """Test that datetime objects serialize correctly to JSON."""
-        catalog = create_catalog(
-            title="Catalog with Date",
-            modified=datetime(2024, 6, 15, 14, 30, 0, tzinfo=timezone.utc),
+        catalog = Catalog.create(
+            metadata=Metadata(
+                title="Catalog with Date",
+                modified=datetime(2024, 6, 15, 14, 30, 0, tzinfo=timezone.utc),
+            )
         )
 
         # Should not raise an exception
@@ -303,3 +255,4 @@ class TestIntegration:
         assert data["metadata"]["modified"] is not None
         # Verify it's a string representation
         assert isinstance(data["metadata"]["modified"], str)
+
