@@ -76,10 +76,10 @@ class DataProvider(ABC):
     @dataclass
     class SearchResponse:
         """Response from a search query."""
-        provider: DataProvider
+        provider: 'DataProvider'
         records: List[DataProviderRecord]
         total: int
-        request: SearchRequest
+        request: 'DataProvider.SearchRequest'
     
         @property
         def page(self) -> int:
@@ -104,7 +104,7 @@ class DataProvider(ABC):
         limit: int = 50,
         offset: int = 0,
         sort: Optional[str] = None,
-    ) -> DataRecord.SearchResponse:
+    ) -> 'DataProvider.SearchResponse':
         """Search for publications matching the query.
         
         Args:

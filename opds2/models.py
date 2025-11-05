@@ -148,24 +148,60 @@ class Catalog(BaseModel):
 
     @staticmethod
     def create(
-        data: 'DataProvider.SearchResponse',
+        data: Optional['DataProvider.SearchResponse'] = None,
         paginate: bool = True,
         # Catalog properties
-        metadata: Metadata | None = None,
-        links: list[Link] | None = None,
-        publications: list[Publication] | None = None,
-        navigation: list[Navigation] | None = None,
-        groups: list['Catalog'] | None = None,
-        facets: list[dict[str, Any]] | None = None,
+        metadata: Optional[Metadata] = None,
+        links: Optional[List[Link]] = None,
+        publications: Optional[List[Publication]] = None,
+        navigation: Optional[List[Navigation]] = None,
+        groups: Optional[List['Catalog']] = None,
+        facets: Optional[List[Dict[str, Any]]] = None,
+        # Backward compatibility
+        self_link: Optional[str] = None,
+        search_link: Optional[str] = None,
     ) -> 'Catalog':
         """
-        Search for publications and return an OPDS Catalog.
+        Create an OPDS Catalog, optionally from search results.
+        
+        Args:
+            data: Optional SearchResponse for paginated search results
+            paginate: Whether to add pagination links (requires data)
+            metadata: Catalog metadata
+            links: Additional links
+            publications: Publications to include (cannot be used with paginate=True)
+            navigation: Navigation items
+            groups: Grouped collections
+            facets: Faceting information
+            self_link: Convenience parameter to add a self link
+            search_link: Convenience parameter to add a search link
         """
 
         metadata = metadata or Metadata()
         links = links or []
+        
+        # Add self link if provided
+        if self_link:
+            links.append(
+                Link(
+                    rel="self",
+                    href=self_link,
+                    type="application/opds+json",
+                )
+            )
+        
+        # Add search link if provided
+        if search_link:
+            links.append(
+                Link(
+                    rel="search",
+                    href=search_link,
+                    type="application/opds+json",
+                    templated="{" in search_link,  # Auto-detect if templated
+                )
+            )
 
-        if paginate:
+        if data and paginate:
             req = data.request
             if publications:
                 raise ValueError("Unexpected publication with query")
@@ -229,6 +265,10 @@ class Catalog(BaseModel):
                         type="application/opds+json",
                     )
                 )
+
+        # Ensure publications is at least an empty list, not None
+        if publications is None:
+            publications = []
 
         return Catalog(
             metadata=metadata,

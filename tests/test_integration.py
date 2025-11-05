@@ -2,18 +2,67 @@
 
 import json
 from datetime import datetime, timezone
-from typing import List
+from typing import List, Optional
 
 from opds2 import (
     Catalog,
     Contributor,
     DataProvider,
+    DataProviderRecord,
     Link,
     Metadata,
     Publication,
-    create_catalog,
-    create_search_catalog,
 )
+
+
+# Helper functions for backward compatibility
+def create_catalog(
+    title: str = "Catalog",
+    publications: Optional[List[Publication]] = None,
+    self_link: Optional[str] = None,
+    search_link: Optional[str] = None,
+    identifier: Optional[str] = None,
+    modified: Optional[datetime] = None,
+) -> Catalog:
+    """Helper function to create a catalog with a simple API."""
+    metadata = Metadata(
+        title=title,
+        identifier=identifier,
+        modified=modified,
+    )
+    return Catalog.create(
+        metadata=metadata,
+        publications=publications,
+        self_link=self_link,
+        search_link=search_link,
+        paginate=False,
+    )
+
+
+def create_search_catalog(
+    provider: DataProvider,
+    query: str,
+    limit: int = 50,
+    offset: int = 0,
+    self_link: Optional[str] = None,
+) -> Catalog:
+    """Helper function to create a search catalog."""
+    search_response = provider.search(query, limit=limit, offset=offset)
+    
+    # Generate a title based on query and results
+    if search_response.total == 0:
+        title = f"No results found for '{query}'" if query else "No results found"
+    else:
+        title = f"Search results for '{query}'" if query else f"All results ({search_response.total} items)"
+    
+    metadata = Metadata(title=title)
+    
+    return Catalog.create(
+        data=search_response,
+        paginate=True,
+        metadata=metadata,
+        self_link=self_link,
+    )
 
 
 class TestIntegration:
@@ -24,9 +73,13 @@ class TestIntegration:
 
         # Step 1: Create a DataProvider implementation
         class SimpleProvider(DataProvider):
+            TITLE = "Simple Test Provider"
+            BASE_URL = "https://example.com"
+            SEARCH_URL = "/search{?query}"
+            
             def search(
-                self, query: str, limit: int = 50, offset: int = 0
-            ) -> List[Publication]:
+                self, query: str, limit: int = 50, offset: int = 0, sort=None
+            ) -> DataProvider.SearchResponse:
                 books = [
                     {
                         "title": "Test Book 1",
@@ -40,23 +93,51 @@ class TestIntegration:
                     },
                 ]
 
-                results = []
+                all_results = []
                 for book in books:
                     if not query or query.lower() in book["title"].lower():
-                        metadata = Metadata(
-                            title=book["title"],
-                            author=[Contributor(name=book["author"], role="author")],
+                        all_results.append(book)
+                
+                total = len(all_results)
+                results = all_results[offset : offset + limit]
+                
+                class SimpleRecord(DataProviderRecord):
+                    model_config = {'extra': 'allow'}  # Allow extra fields
+                    
+                    def __init__(self, book_data):
+                        super().__init__(book_data=book_data)
+                    
+                    def metadata(self) -> Metadata:
+                        return Metadata(
+                            title=self.book_data["title"],
+                            author=[Contributor(name=self.book_data["author"], role="author")],
                         )
-                        links = [
+                    
+                    def links(self) -> List[Link]:
+                        return [
                             Link(
-                                href=book["url"],
+                                href=self.book_data["url"],
                                 type="application/epub+zip",
                                 rel="http://opds-spec.org/acquisition",
                             )
                         ]
-                        results.append(Publication(metadata=metadata, links=links))
-
-                return results[offset : offset + limit]
+                    
+                    def images(self):
+                        return None
+                
+                records = [SimpleRecord(book) for book in results]
+                
+                return DataProvider.SearchResponse(
+                    provider=self,
+                    records=records,
+                    total=total,
+                    request=DataProvider.SearchRequest(
+                        query=query,
+                        limit=limit,
+                        offset=offset,
+                        sort=sort
+                    )
+                )
 
         provider = SimpleProvider()
 
