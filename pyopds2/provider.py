@@ -69,7 +69,7 @@ class DataProvider(ABC):
     @dataclass
     class SearchResponse:
         """Response from a search query."""
-        provider: 'DataProvider'
+        provider: 'DataProvider | type[DataProvider]'
         query: str
         limit: int
         offset: int
