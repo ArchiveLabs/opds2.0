@@ -27,7 +27,7 @@ To use this library, you must implement two key classes:
 ### Example
 
 ```python
-from opds2 import Catalog, DataProvider, DataProviderRecord, Metadata, Link, SearchResponse
+from pyopds2 import Catalog, DataProvider, DataProviderRecord, Metadata, Link, SearchResponse
 
 class MyRecord(DataProviderRecord):
     def metadata(self):
