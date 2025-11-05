@@ -5,12 +5,12 @@ Data providers implement the logic for searching and retrieving publications.
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+import functools
 from typing import List, Optional
-
 from pydantic import BaseModel
-from typing import Optional
 
 from opds2.models import Metadata, Publication, Link
+from opds2.helpers import build_url
 
 
 class DataProviderRecord(BaseModel, ABC):
@@ -43,39 +43,6 @@ class DataProviderRecord(BaseModel, ABC):
             images=self.images()
         )
 
-
-@dataclass
-class SearchRequest:
-    """Request parameters for a search query."""
-    query: str
-    limit: int = 50
-    offset: int = 0
-    sort: Optional[str] = None
-
-
-@dataclass
-class SearchResponse:
-    """Response from a search query."""
-    records: List[DataProviderRecord]
-    total: int
-    request: SearchRequest
-
-    @property
-    def page(self) -> int:
-        """Calculate current page number based on offset and limit."""
-        return (self.request.offset // self.request.limit) + 1 if self.request.limit else 1
-    
-    @property
-    def last_page(self) -> int:
-        """Calculate last page number based on total and limit."""
-        return (self.total + self.request.limit - 1) // self.request.limit
-
-    @property
-    def has_more(self) -> bool:
-        """Determine if there are more results beyond the current page."""
-        req = self.request
-        return (req.offset + req.limit) < self.total
-
 class DataProvider(ABC):
     """Abstract base class for OPDS 2.0 data providers.
     
@@ -97,7 +64,52 @@ class DataProvider(ABC):
 
     SEARCH_URL: str = "/opds/search{?query}"
     """The relative url template for search queries."""
+
+    @dataclass
+    class SearchResponse:
+        """Response from a search query."""
+        provider: 'DataProvider'
+        query: str
+        limit: int
+        offset: int
+        sort: Optional[str]
+        records: List[DataProviderRecord]
+        total: int
+
+        def get_search_url(self, **kwargs: str) -> str:
+            base_url = self.provider.SEARCH_URL.replace("{?query}", "")
+            if base_url.startswith("/"):
+                base_url = self.provider.BASE_URL.rstrip('/') + base_url
+            return build_url(base_url, params=self.params | kwargs)
+
+        @functools.cached_property
+        def params(self) -> dict:
+            p: dict[str, str] = {}
+            if self.query:
+                p["query"] = self.query
+            if self.limit:
+                p["limit"] = str(self.limit)
+            if self.page > 1:
+                p["page"] = str(self.page)
+            if self.sort:
+                p["sort"] = self.sort
+            return p
+
+        @property
+        def page(self) -> int:
+            """Calculate current page number based on offset and limit."""
+            return (self.offset // self.limit) + 1 if self.limit else 1
+ 
+        @property
+        def last_page(self) -> int:
+            """Calculate last page number based on total and limit."""
+            return (self.total + self.limit - 1) // self.limit
     
+        @property
+        def has_more(self) -> bool:
+            """Determine if there are more results beyond the current page."""
+            return (self.offset + self.limit) < self.total
+
     @staticmethod
     @abstractmethod
     def search(
@@ -105,7 +117,7 @@ class DataProvider(ABC):
         limit: int = 50,
         offset: int = 0,
         sort: Optional[str] = None,
-    ) -> SearchResponse:
+    ) -> 'DataProvider.SearchResponse':
         """Search for publications matching the query.
         
         Args:
@@ -115,6 +127,14 @@ class DataProvider(ABC):
             sort: Optional sorting parameter
             
         Returns:
-            List of Publication objects matching the search criteria
+            SearchResponse object containing search results
         """
-        pass
+        return DataProvider.SearchResponse(
+            DataProvider,
+            records=[],
+            total=0,
+            query=query,
+            limit=limit,
+            offset=offset,
+            sort=sort
+        )

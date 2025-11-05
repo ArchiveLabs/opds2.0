@@ -2,7 +2,7 @@
 
 import json
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 
 from opds2 import Catalog
 from opds2.models import Contributor, Link, Metadata, Publication
@@ -11,6 +11,10 @@ from opds2.provider import DataProvider
 
 class MockDataProvider(DataProvider):
     """Mock data provider for testing."""
+    
+    TITLE = "Mock Library"
+    BASE_URL = "https://example.com"
+    SEARCH_URL = "/search{?query}"
     
     def __init__(self):
         self.books = [
@@ -34,32 +38,107 @@ class MockDataProvider(DataProvider):
             },
         ]
     
-    def search(self, query: str, limit: int = 50, offset: int = 0) -> List[Publication]:
+    def search(self, query: str, limit: int = 50, offset: int = 0, sort=None) -> DataProvider.SearchResponse:
         """Search mock books."""
         # Simple case-insensitive search
         query_lower = query.lower()
-        results = [
+        all_results = [
             book for book in self.books
             if query_lower in book["title"].lower() or query_lower in book["author"].lower()
         ]
         
+        total = len(all_results)
+        
         # Apply pagination
-        results = results[offset:offset + limit]
+        results = all_results[offset:offset + limit]
         
-        # Convert to Publication objects
-        publications = []
-        for book in results:
-            metadata = Metadata(
-                title=book["title"],
-                author=[Contributor(name=book["author"], role="author")],
-                language=[book["language"]]
+        # Convert to DataProviderRecord objects
+        from opds2.provider import DataProviderRecord
+        
+        class MockRecord(DataProviderRecord):
+            model_config = {'extra': 'allow'}  # Allow extra fields
+            
+            def __init__(self, book_data):
+                super().__init__(book_data=book_data)
+            
+            def metadata(self) -> Metadata:
+                return Metadata(
+                    title=self.book_data["title"],
+                    author=[Contributor(name=self.book_data["author"], role="author")],
+                    language=[self.book_data["language"]]
+                )
+            
+            def links(self) -> List[Link]:
+                return [
+                    Link(href=self.book_data["url"], type="application/epub+zip", rel="http://opds-spec.org/acquisition")
+                ]
+            
+            def images(self):
+                return None
+        
+        records = [MockRecord(book) for book in results]
+        
+        return DataProvider.SearchResponse(
+            provider=self,
+            records=records,
+            total=total,
+            request=DataProvider.SearchRequest(
+                query=query,
+                limit=limit,
+                offset=offset,
+                sort=sort
             )
-            links = [
-                Link(href=book["url"], type="application/epub+zip", rel="http://opds-spec.org/acquisition")
-            ]
-            publications.append(Publication(metadata=metadata, links=links))
-        
-        return publications
+        )
+
+
+# Helper functions for backward compatibility
+def create_catalog(
+    title: str = "Catalog",
+    publications: Optional[List[Publication]] = None,
+    self_link: Optional[str] = None,
+    search_link: Optional[str] = None,
+    identifier: Optional[str] = None,
+    modified: Optional[datetime] = None,
+) -> Catalog:
+    """Helper function to create a catalog with a simple API."""
+    metadata = Metadata(
+        title=title,
+        identifier=identifier,
+        modified=modified,
+    )
+    return Catalog.create(
+        metadata=metadata,
+        publications=publications,
+        self_link=self_link,
+        search_link=search_link,
+        paginate=False,
+    )
+
+
+def create_search_catalog(
+    provider: DataProvider,
+    query: str,
+    limit: int = 50,
+    offset: int = 0,
+    self_link: Optional[str] = None,
+) -> Catalog:
+    """Helper function to create a search catalog."""
+    search_response = provider.search(query, limit=limit, offset=offset)
+    
+    # Generate a title based on query and results
+    if search_response.total == 0:
+        title = f"No results found for '{query}'" if query else "No results found"
+    else:
+        title = f"Search results for '{query}'" if query else f"All results ({search_response.total} items)"
+    
+    metadata = Metadata(title=title)
+    
+    return Catalog.create(
+        data=search_response,
+        paginate=True,
+        metadata=metadata,
+        self_link=self_link,
+    )
 
 
 def test_data_provider_search():
@@ -67,8 +146,9 @@ def test_data_provider_search():
     provider = MockDataProvider()
     results = provider.search("gatsby")
     
-    assert len(results) == 1
-    assert results[0].metadata.title == "The Great Gatsby"
+    assert len(results.records) == 1
+    assert results.records[0].metadata().title == "The Great Gatsby"
+    assert results.total == 1
 
 
 def test_data_provider_search_multiple_results():
@@ -76,7 +156,8 @@ def test_data_provider_search_multiple_results():
     provider = MockDataProvider()
     results = provider.search("the")
     
-    assert len(results) == 1  # "The Great Gatsby" (only title matches "the")
+    assert len(results.records) == 1  # "The Great Gatsby" (only title matches "the")
+    assert results.total == 1
 
 
 def test_data_provider_search_no_results():
@@ -84,7 +165,8 @@ def test_data_provider_search_no_results():
     provider = MockDataProvider()
     results = provider.search("xyz123")
     
-    assert len(results) == 0
+    assert len(results.records) == 0
+    assert results.total == 0
 
 
 def test_data_provider_search_pagination():
@@ -93,16 +175,19 @@ def test_data_provider_search_pagination():
     
     # Get all results
     all_results = provider.search("")
-    assert len(all_results) == 3
+    assert len(all_results.records) == 3
+    assert all_results.total == 3
     
     # Get first result with limit
     results = provider.search("", limit=1)
-    assert len(results) == 1
+    assert len(results.records) == 1
+    assert results.total == 3
     
     # Get second result with offset
     results = provider.search("", limit=1, offset=1)
-    assert len(results) == 1
-    assert results[0].metadata.title == "To Kill a Mockingbird"
+    assert len(results.records) == 1
+    assert results.records[0].metadata().title == "To Kill a Mockingbird"
+    assert results.total == 3
 
 
 def test_create_catalog_basic():

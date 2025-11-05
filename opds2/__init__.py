@@ -14,7 +14,7 @@ from opds2.models import (
     Navigation,
     Publication,
 )
-from opds2.provider import DataProvider, DataProviderRecord, SearchRequest, SearchResponse
+from opds2.provider import DataProvider, DataProviderRecord
 
 __all__ = [
     "Catalog",
@@ -25,6 +25,4 @@ __all__ = [
     "Metadata",
     "Navigation",
     "Publication",
-    "SearchRequest",
-    "SearchResponse",
 ]

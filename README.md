@@ -42,7 +42,7 @@ class MyProvider(DataProvider):
     def search(query, limit=50, offset=0, sort=None):
         records = [MyRecord()]
         # Return a list of MyRecord instances and total count
-        return SearchResponse(records, len(records), SearchRequest(query, limit, offset, sort))
+        return SearchResponse(records, len(records), query, limit, offset, sort)
 
 catalog = Catalog.create(MyProvider, search=MyProvider.search("example"))
 print(catalog.model_dump_json(indent=2))

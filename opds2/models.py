@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field # field_validator
 
 
 if TYPE_CHECKING:
-    from opds2.provider import DataProvider, SearchResponse
+    from opds2.provider import DataProvider
 
 
 class Link(BaseModel):
@@ -117,7 +117,6 @@ class Catalog(BaseModel):
 
     model_config = {"extra": "allow"}
 
-    #@field_validator("links", mode="before")
     @classmethod
     def ensure_self_link(cls, v: List[Link]) -> List[Link]:
         """Ensure there's at least a structure for links."""
@@ -145,96 +144,81 @@ class Catalog(BaseModel):
         # Use model_dump to get the dict with @context, then serialize to JSON
         data = self.model_dump(**kwargs)
         return json.dumps(data, default=str)
+    
+    def add_pagination(self, response: 'DataProvider.SearchResponse'):
+        """
+        Add pagination to the current Catalog based on the SearchResponse.
+        """
+        self.metadata.numberOfItems = response.total
+        self.metadata.itemsPerPage = response.limit
+        self.metadata.currentPage = response.page
 
-    @staticmethod
+        self.links.append(
+            Link(
+                rel="self",
+                href=response.get_search_url(),
+                type="application/opds+json",
+            )
+        )
+        self.links.append(
+            Link(
+                rel="first",
+                href=response.get_search_url(page=1),
+                type="application/opds+json",
+            )
+        )
+
+        if response.page > 1:
+            self.links.append(
+                Link(
+                    rel="previous",
+                    href=response.get_search_url(page=response.page-1),
+                    type="application/opds+json",
+                )
+            )
+
+        if response.has_more:
+            self.links.append(
+                Link(
+                    rel="next",
+                    href=response.get_search_url(page=response.page+1),
+                    type="application/opds+json",
+                )
+            )
+            self.links.append(
+                Link(
+                    rel="last",
+                    href=response.get_search_url(page=response.last_page),
+                    type="application/opds+json",
+                )
+            )
+        return self
+
+    @classmethod
     def create(
-        provider: 'DataProvider',
-
+        cls, 
+        response: Optional['DataProvider.SearchResponse'] = None,
+        paginate: bool = True,
         # Catalog properties
-        metadata: Metadata | None = None,
-        links: list[Link] | None = None,
-        publications: list[Publication] | None = None,
-        navigation: list[Navigation] | None = None,
-        groups: list['Catalog'] | None = None,
-        facets: list[dict[str, Any]] | None = None,
-        search: 'SearchResponse | None' = None,
+        metadata: Optional[Metadata] = None,
+        links: Optional[List[Link]] = None,
+        publications: Optional[List[Publication]] = None,
+        navigation: Optional[List[Navigation]] = None,
+        groups: Optional[List['Catalog']] = None,
+        facets: Optional[List[Dict[str, Any]]] = None,
     ) -> 'Catalog':
         """
-        Search for publications and return an OPDS Catalog.
-
+        Create an OPDS Catalog, optionally from search results.
+        
         Args:
-            search: SearchResponse from DataProvider to convert to publication/etc.
+            response: Optional SearchResponse for paginated search results
+            paginate: Whether to add pagination links (requires data)
         """
-
         metadata = metadata or Metadata()
         links = links or []
+        publications = publications or []
 
-        if search:
-            req = search.request
-            if publications:
-                raise ValueError("Unexpected publication with query")
-
-            publications = [record.to_publication() for record in search.records]
-            params: dict[str, str] = {}
-            if req.query:
-                params["query"] = req.query
-            if req.limit:
-                params["limit"] = str(req.limit)
-            if search.page > 1:
-                params["page"] = str(search.page)
-            if req.sort:
-                params["sort"] = req.sort
-
-            metadata.numberOfItems = search.total
-            metadata.itemsPerPage = req.limit
-            metadata.currentPage = search.page
-
-            base_url = provider.SEARCH_URL.replace("{?query}", "")
-            if base_url.startswith("/"):
-                base_url = provider.BASE_URL.rstrip('/') + base_url
-
-            self_url = base_url + ("?" + urlencode(params) if params else "")
-            links.append(
-                Link(
-                    rel="self",
-                    href=self_url,
-                    type="application/opds+json",
-                )
-            )
-            links.append(
-                Link(
-                    rel="first",
-                    href=base_url + "?" + urlencode(params | {"page": "1"}),
-                    type="application/opds+json",
-                )
-            )
-
-            if search.page > 1:
-                links.append(
-                    Link(
-                        rel="previous",
-                        href=base_url + "?" + urlencode(params | {"page": str(search.page - 1)}),
-                        type="application/opds+json",
-                    )
-                )
-
-            if search.has_more:
-                links.append(
-                    Link(
-                        rel="next",
-                        href=base_url + "?" + urlencode(params | {"page": str(search.page + 1)}),
-                        type="application/opds+json",
-                    )
-                )
-                links.append(
-                    Link(
-                        rel="last",
-                        href=base_url + "?" + urlencode(params | {"page": str(search.last_page)}),
-                        type="application/opds+json",
-                    )
-                )
-
-        return Catalog(
+        catalog = Catalog(
             metadata=metadata,
             links=links,
             publications=publications,
@@ -242,3 +226,13 @@ class Catalog(BaseModel):
             groups=groups,
             facets=facets,
         )
+
+        if response:
+            if publications:
+                raise ValueError("Cannot specify both publications and response parameters - publications are generated from the response")
+            catalog.publications = [record.to_publication() for record in response.records]
+        
+            if paginate:        
+                catalog.add_pagination(response)
+
+        return catalog
