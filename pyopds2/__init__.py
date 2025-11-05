@@ -6,7 +6,7 @@ Based on the OPDS 2.0 specification at https://drafts.opds.io/opds-2.0
 
 __version__ = "0.1.0"
 
-from opds2.models import (
+from pyopds2.models import (
     Catalog,
     Contributor,
     Link,
@@ -14,7 +14,7 @@ from opds2.models import (
     Navigation,
     Publication,
 )
-from opds2.provider import DataProvider, DataProviderRecord
+from pyopds2.provider import DataProvider, DataProviderRecord
 
 __all__ = [
     "Catalog",

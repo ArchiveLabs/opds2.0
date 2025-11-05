@@ -5,18 +5,17 @@ Based on the OPDS 2.0 specification and Web Publication Manifest.
 
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
-from urllib.parse import urlencode
 
-from pydantic import BaseModel, Field # field_validator
+from pydantic import BaseModel, Field  # field_validator
 
 
 if TYPE_CHECKING:
-    from opds2.provider import DataProvider
+    from pyopds2.provider import DataProvider
 
 
 class Link(BaseModel):
     """Represents a link in OPDS 2.0.
-    
+
     Links are used to associate resources with a publication or catalog.
     """
     href: str = Field(..., description="URI or URI template of the linked resource")
@@ -42,7 +41,7 @@ class Contributor(BaseModel):
 
 class Metadata(BaseModel):
     """Metadata for a publication or catalog.
-    
+
     Contains descriptive information about the resource.
     """
     title: str = Field(..., description="Title of the resource")
@@ -65,7 +64,7 @@ class Metadata(BaseModel):
 
 class Publication(BaseModel):
     """Represents a publication in OPDS 2.0.
-    
+
     A publication is a digital work (book, audiobook, etc.) with metadata and links.
     """
     metadata: Metadata = Field(..., description="Metadata about the publication")
@@ -93,13 +92,13 @@ class Navigation(BaseModel):
 
 class Catalog(BaseModel):
     """Represents an OPDS 2.0 catalog/feed.
-    
+
     A catalog is a collection of publications with optional navigation.
     """
     metadata: Metadata = Field(..., description="Metadata about the catalog")
     links: List[Link] = Field(default_factory=list, description="Links (self, search, etc.)")
     publications: Optional[List[Publication]] = Field(
-        None, 
+        None,
         description="List of publications in this catalog"
     )
     navigation: Optional[List[Navigation]] = Field(
@@ -144,7 +143,7 @@ class Catalog(BaseModel):
         # Use model_dump to get the dict with @context, then serialize to JSON
         data = self.model_dump(**kwargs)
         return json.dumps(data, default=str)
-    
+
     def add_pagination(self, response: 'DataProvider.SearchResponse'):
         """
         Add pagination to the current Catalog based on the SearchResponse.
@@ -196,7 +195,7 @@ class Catalog(BaseModel):
 
     @classmethod
     def create(
-        cls, 
+        cls,
         response: Optional['DataProvider.SearchResponse'] = None,
         paginate: bool = True,
         # Catalog properties
@@ -209,12 +208,12 @@ class Catalog(BaseModel):
     ) -> 'Catalog':
         """
         Create an OPDS Catalog, optionally from search results.
-        
+
         Args:
             response: Optional SearchResponse for paginated search results
             paginate: Whether to add pagination links (requires data)
         """
-        metadata = metadata or Metadata()
+        metadata = metadata or Metadata(title="OPDS Catalog")
         links = links or []
         publications = publications or []
 
@@ -229,10 +228,16 @@ class Catalog(BaseModel):
 
         if response:
             if publications:
-                raise ValueError("Cannot specify both publications and response parameters - publications are generated from the response")
-            catalog.publications = [record.to_publication() for record in response.records]
-        
-            if paginate:        
+                raise ValueError(
+                    "Cannot specify both publications and response "
+                    "parameters - publications are generated from "
+                    "the response"
+                )
+            catalog.publications = [
+                record.to_publication() for record in response.records
+            ]
+
+            if paginate:
                 catalog.add_pagination(response)
 
         return catalog

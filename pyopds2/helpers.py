@@ -1,6 +1,7 @@
 from urllib.parse import urlencode, urlparse, parse_qsl, urlunparse
 
-def build_url(base_url: str, params: dict[str, str]  | None = None) -> str:
+
+def build_url(base_url: str, params: dict[str, str] | None = None) -> str:
     if not params:
         return base_url
 
