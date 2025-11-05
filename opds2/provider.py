@@ -8,7 +8,6 @@ from dataclasses import dataclass
 import functools
 from typing import List, Optional
 from pydantic import BaseModel
-from typing import Optional
 
 from opds2.models import Metadata, Publication, Link
 from opds2.helpers import build_url
