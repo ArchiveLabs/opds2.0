@@ -229,7 +229,7 @@ class Catalog(BaseModel):
 
         if response:
             if publications:
-                raise ValueError("Unexpected publication with query")
+                raise ValueError("Cannot specify both publications and response parameters - publications are generated from the response")
             catalog.publications = [record.to_publication() for record in response.records]
         
             if paginate:        
