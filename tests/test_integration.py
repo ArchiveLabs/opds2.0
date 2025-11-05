@@ -255,4 +255,3 @@ class TestIntegration:
         assert data["metadata"]["modified"] is not None
         # Verify it's a string representation
         assert isinstance(data["metadata"]["modified"], str)
-

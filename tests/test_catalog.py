@@ -258,4 +258,3 @@ def test_catalog_integration():
     assert len(search_data["publications"]) == 1
     pub_title = search_data["publications"][0]["metadata"]["title"]
     assert pub_title == "The Great Gatsby"
-
