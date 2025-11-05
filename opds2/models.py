@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field # field_validator
 
 
 if TYPE_CHECKING:
-    from opds2.provider import DataProvider, SearchResponse
+    from opds2.provider import DataProvider
 
 
 class Link(BaseModel):
@@ -148,8 +148,8 @@ class Catalog(BaseModel):
 
     @staticmethod
     def create(
-        provider: 'DataProvider',
-
+        data: 'DataProvider.SearchResponse',
+        paginate: bool = True,
         # Catalog properties
         metadata: Metadata | None = None,
         links: list[Link] | None = None,
@@ -157,7 +157,6 @@ class Catalog(BaseModel):
         navigation: list[Navigation] | None = None,
         groups: list['Catalog'] | None = None,
         facets: list[dict[str, Any]] | None = None,
-        search: 'SearchResponse | None' = None,
     ) -> 'Catalog':
         """
         Search for publications and return an OPDS Catalog.
@@ -169,27 +168,27 @@ class Catalog(BaseModel):
         metadata = metadata or Metadata()
         links = links or []
 
-        if search:
-            req = search.request
+        if paginate:
+            req = data.request
             if publications:
                 raise ValueError("Unexpected publication with query")
 
-            publications = [record.to_publication() for record in search.records]
+            publications = [record.to_publication() for record in data.records]
             params: dict[str, str] = {}
             if req.query:
                 params["query"] = req.query
             if req.limit:
                 params["limit"] = str(req.limit)
-            if search.page > 1:
-                params["page"] = str(search.page)
+            if data.page > 1:
+                params["page"] = str(data.page)
             if req.sort:
                 params["sort"] = req.sort
 
-            metadata.numberOfItems = search.total
+            metadata.numberOfItems = data.total
             metadata.itemsPerPage = req.limit
-            metadata.currentPage = search.page
+            metadata.currentPage = data.page
 
-            base_url = provider.SEARCH_URL.replace("{?query}", "")
+            base_url = data.provider.SEARCH_URL.replace("{?query}", "")
             if base_url.startswith("/"):
                 base_url = provider.BASE_URL.rstrip('/') + base_url
 
@@ -209,11 +208,11 @@ class Catalog(BaseModel):
                 )
             )
 
-            if search.page > 1:
+            if data.page > 1:
                 links.append(
                     Link(
                         rel="previous",
-                        href=base_url + "?" + urlencode(params | {"page": str(search.page - 1)}),
+                        href=base_url + "?" + urlencode(params | {"page": str(data.page - 1)}),
                         type="application/opds+json",
                     )
                 )
