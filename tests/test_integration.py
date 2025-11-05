@@ -4,8 +4,8 @@ import json
 from datetime import datetime, timezone
 from typing import List, Optional
 
-from opds2 import Catalog, Contributor, Link, Metadata, Publication
-from opds2.provider import DataProvider, DataProviderRecord
+from pyopds2 import Catalog, Contributor, Link, Metadata, Publication
+from pyopds2.provider import DataProvider, DataProviderRecord
 
 
 class SimpleBook(DataProviderRecord):

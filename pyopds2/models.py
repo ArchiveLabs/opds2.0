@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field  # field_validator
 
 
 if TYPE_CHECKING:
-    from opds2.provider import DataProvider
+    from pyopds2.provider import DataProvider
 
 
 class Link(BaseModel):

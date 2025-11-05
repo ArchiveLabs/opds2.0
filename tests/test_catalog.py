@@ -4,9 +4,9 @@ import json
 from datetime import datetime
 from typing import List, Optional
 
-from opds2 import Catalog
-from opds2.models import Contributor, Link, Metadata, Publication
-from opds2.provider import DataProvider, DataProviderRecord
+from pyopds2 import Catalog
+from pyopds2.models import Contributor, Link, Metadata, Publication
+from pyopds2.provider import DataProvider, DataProviderRecord
 
 
 class MockBook(DataProviderRecord):

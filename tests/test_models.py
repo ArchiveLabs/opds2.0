@@ -3,7 +3,7 @@
 import json
 from datetime import datetime
 
-from opds2.models import (
+from pyopds2.models import (
     Catalog,
     Contributor,
     Link,

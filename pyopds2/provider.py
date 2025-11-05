@@ -9,8 +9,8 @@ import functools
 from typing import List, Optional
 from pydantic import BaseModel
 
-from opds2.models import Metadata, Publication, Link
-from opds2.helpers import build_url
+from pyopds2.models import Metadata, Publication, Link
+from pyopds2.helpers import build_url
 
 
 class DataProviderRecord(BaseModel, ABC):
