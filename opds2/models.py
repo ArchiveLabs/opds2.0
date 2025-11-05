@@ -211,7 +211,7 @@ class Catalog(BaseModel):
         Create an OPDS Catalog, optionally from search results.
         
         Args:
-            data: Optional SearchResponse for paginated search results
+            response: Optional SearchResponse for paginated search results
             paginate: Whether to add pagination links (requires data)
         """
         metadata = metadata or Metadata()
