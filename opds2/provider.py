@@ -7,11 +7,11 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 import functools
 from typing import List, Optional
-
 from pydantic import BaseModel
 from typing import Optional
 
 from opds2.models import Metadata, Publication, Link
+from opds2.helpers import build_url
 
 
 class DataProviderRecord(BaseModel, ABC):
@@ -71,29 +71,29 @@ class DataProvider(ABC):
         """Response from a search query."""
         provider: 'DataProvider'
         query: str
-        limit: int = 50
-        offset: int = 0
-        sort: Optional[str] = None
+        limit: int
+        offset: int
+        sort: Optional[str]
         records: List[DataProviderRecord]
         total: int
 
-        def get_base_search_url(self, **kwargs) -> str:
+        def get_search_url(self, **kwargs: str) -> str:
             base_url = self.provider.SEARCH_URL.replace("{?query}", "")
             if base_url.startswith("/"):
                 base_url = self.provider.BASE_URL.rstrip('/') + base_url
-            return f"{base_url}{urlencode(self.params | kwargs})"
+            return build_url(base_url, params=self.params | kwargs)
 
         @functools.cached_property
         def params(self) -> dict:
             p: dict[str, str] = {}
-            if response.query:
+            if self.query:
                 p["query"] = self.query
-            if response.limit:
+            if self.limit:
                 p["limit"] = str(self.limit)
-            if response.page > 1:
-                p["page"] = str(response.page)
-            if response.sort:
-                p["sort"] = response.sort
+            if self.page > 1:
+                p["page"] = str(self.page)
+            if self.sort:
+                p["sort"] = self.sort
             return p
 
         @property
@@ -104,13 +104,12 @@ class DataProvider(ABC):
         @property
         def last_page(self) -> int:
             """Calculate last page number based on total and limit."""
-            return (self.total + self.request.limit - 1) // self.request.limit
+            return (self.total + self.limit - 1) // self.limit
     
         @property
         def has_more(self) -> bool:
             """Determine if there are more results beyond the current page."""
-            req = self.request
-            return (req.offset + req.limit) < self.total
+            return (self.offset + self.limit) < self.total
 
     @staticmethod
     @abstractmethod
@@ -131,4 +130,12 @@ class DataProvider(ABC):
         Returns:
             SearchResponse object containing search results
         """
-        pass
+        return DataProvider.SearchResponse(
+            DataProvider,
+            records=[],
+            total=0,
+            query=query,
+            limit=limit,
+            offset=offset,
+            sort=sort
+        )

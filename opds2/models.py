@@ -145,8 +145,10 @@ class Catalog(BaseModel):
         data = self.model_dump(**kwargs)
         return json.dumps(data, default=str)
     
-    def paginate(self, response: 'DataProvider.SearchResponse'):
-
+    def add_pagination(self, response: 'DataProvider.SearchResponse'):
+        """
+        Add pagination to the current Catalog based on the SearchResponse.
+        """
         self.metadata.numberOfItems = response.total
         self.metadata.itemsPerPage = response.limit
         self.metadata.currentPage = response.page
@@ -154,42 +156,43 @@ class Catalog(BaseModel):
         self.links.append(
             Link(
                 rel="self",
-                href=response.base_search_url,
+                href=response.get_search_url(),
                 type="application/opds+json",
             )
         )
-        links.append(
+        self.links.append(
             Link(
                 rel="first",
-                href=response.get_base_search_url(page=1),
+                href=response.get_search_url(page=1),
                 type="application/opds+json",
             )
         )
 
-        if data.page > 1:
-            links.append(
+        if response.page > 1:
+            self.links.append(
                 Link(
                     rel="previous",
-                    href=base_url + "?" + urlencode(params | {"page": str(data.page - 1)}),
+                    href=response.get_search_url(page=response.page-1),
                     type="application/opds+json",
                 )
             )
 
-        if data.has_more:
-            links.append(
+        if response.has_more:
+            self.links.append(
                 Link(
                     rel="next",
-                    href=base_url + "?" + urlencode(params | {"page": str(data.page + 1)}),
+                    href=response.get_search_url(page=response.page+1),
                     type="application/opds+json",
                 )
             )
-            links.append(
+            self.links.append(
                 Link(
                     rel="last",
-                    href=base_url + "?" + urlencode(params | {"page": str(data.last_page)}),
+                    href=response.get_search_url(page=response.last_page),
                     type="application/opds+json",
                 )
             )
+        return self
 
     @classmethod
     def create(
@@ -215,15 +218,7 @@ class Catalog(BaseModel):
         links = links or []
         publications = publications or []
 
-        if response:
-            if publications:
-                raise ValueError("Unexpected publication with query")
-            publications = [record.to_publication() for record in response.records]
-        
-            if paginate:                
-                links += cls.add_pagination(response)
-
-        return Catalog(
+        catalog = Catalog(
             metadata=metadata,
             links=links,
             publications=publications,
@@ -231,3 +226,13 @@ class Catalog(BaseModel):
             groups=groups,
             facets=facets,
         )
+
+        if response:
+            if publications:
+                raise ValueError("Unexpected publication with query")
+            catalog.publications = [record.to_publication() for record in response.records]
+        
+            if paginate:        
+                catalog.add_pagination(response)
+
+        return catalog
