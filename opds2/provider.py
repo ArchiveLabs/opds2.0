@@ -97,9 +97,9 @@ class DataProvider(ABC):
             req = self.request
             return (req.offset + req.limit) < self.total
     
-    @staticmethod
     @abstractmethod
     def search(
+        self,
         query: str,
         limit: int = 50,
         offset: int = 0,
@@ -114,6 +114,6 @@ class DataProvider(ABC):
             sort: Optional sorting parameter
             
         Returns:
-            List of Publication objects matching the search criteria
+            SearchResponse object containing search results
         """
         pass
