@@ -8,14 +8,13 @@ from dataclasses import dataclass
 from typing import List, Optional
 
 from pydantic import BaseModel
-from typing import Optional
 
 from opds2.models import Metadata, Publication, Link
 
 
 class DataProviderRecord(BaseModel, ABC):
     """Abstract base class for data records returned by DataProvider.
-    
+
     Consumers of this library should extend this class to define
     their own data record structure.
     """
@@ -63,8 +62,9 @@ class SearchResponse:
     @property
     def page(self) -> int:
         """Calculate current page number based on offset and limit."""
-        return (self.request.offset // self.request.limit) + 1 if self.request.limit else 1
-    
+        limit = self.request.limit
+        return (self.request.offset // limit) + 1 if limit else 1
+
     @property
     def last_page(self) -> int:
         """Calculate last page number based on total and limit."""
@@ -76,20 +76,26 @@ class SearchResponse:
         req = self.request
         return (req.offset + req.limit) < self.total
 
+
 class DataProvider(ABC):
     """Abstract base class for OPDS 2.0 data providers.
-    
+
     Consumers of this library should extend this class to provide
     their own implementation for searching and retrieving publications.
-    
+
     Example:
         class MyDataProvider(DataProvider):
-            def search(self, query: str, limit: int = 50, offset: int = 0) -> List[Publication]:
+            def search(
+                self,
+                query: str,
+                limit: int = 50,
+                offset: int = 0
+            ) -> List[Publication]:
                 # Implement search logic
                 results = my_search_function(query, limit, offset)
                 return [self._to_publication(item) for item in results]
     """
-    
+
     TITLE: str = "Generic OPDS Service"
 
     BASE_URL: str = "http://localhost"
@@ -97,7 +103,7 @@ class DataProvider(ABC):
 
     SEARCH_URL: str = "/opds/search{?query}"
     """The relative url template for search queries."""
-    
+
     @staticmethod
     @abstractmethod
     def search(
@@ -107,13 +113,13 @@ class DataProvider(ABC):
         sort: Optional[str] = None,
     ) -> SearchResponse:
         """Search for publications matching the query.
-        
+
         Args:
             query: Search query string
             limit: Maximum number of results to return (default: 50)
             offset: Offset for pagination (default: 0)
             sort: Optional sorting parameter
-            
+
         Returns:
             List of Publication objects matching the search criteria
         """

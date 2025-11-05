@@ -14,7 +14,12 @@ from opds2.models import (
     Navigation,
     Publication,
 )
-from opds2.provider import DataProvider, DataProviderRecord, SearchRequest, SearchResponse
+from opds2.provider import (
+    DataProvider,
+    DataProviderRecord,
+    SearchRequest,
+    SearchResponse,
+)
 
 __all__ = [
     "Catalog",

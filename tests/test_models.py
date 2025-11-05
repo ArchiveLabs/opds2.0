@@ -3,8 +3,6 @@
 import json
 from datetime import datetime
 
-import pytest
-
 from opds2.models import (
     Catalog,
     Contributor,
@@ -17,7 +15,11 @@ from opds2.models import (
 
 def test_link_creation():
     """Test creating a Link object."""
-    link = Link(href="https://example.com/book.epub", type="application/epub+zip", rel="http://opds-spec.org/acquisition")
+    link = Link(
+        href="https://example.com/book.epub",
+        type="application/epub+zip",
+        rel="http://opds-spec.org/acquisition"
+    )
     assert link.href == "https://example.com/book.epub"
     assert link.type == "application/epub+zip"
     assert link.rel == "http://opds-spec.org/acquisition"
@@ -125,23 +127,27 @@ def test_catalog_json_export():
         modified=datetime(2024, 1, 1, 12, 0, 0)
     )
     links = [
-        Link(href="https://example.com/catalog", rel="self", type="application/opds+json")
+        Link(
+            href="https://example.com/catalog",
+            rel="self",
+            type="application/opds+json"
+        )
     ]
-    
+
     publication = Publication(
         metadata=Metadata(title="Sample Book"),
         links=[Link(href="https://example.com/book.epub")]
     )
-    
+
     catalog = Catalog(
         metadata=metadata,
         links=links,
         publications=[publication]
     )
-    
+
     json_str = catalog.model_dump_json()
     assert json_str is not None
-    
+
     # Parse and verify
     data = json.loads(json_str)
     assert "@context" in data
@@ -154,12 +160,21 @@ def test_catalog_with_search_link():
     """Test Catalog with search link."""
     metadata = Metadata(title="Searchable Catalog")
     links = [
-        Link(href="https://example.com/catalog", rel="self", type="application/opds+json"),
-        Link(href="https://example.com/search?q={searchTerms}", rel="search", type="application/opds+json", templated=True)
+        Link(
+            href="https://example.com/catalog",
+            rel="self",
+            type="application/opds+json"
+        ),
+        Link(
+            href="https://example.com/search?q={searchTerms}",
+            rel="search",
+            type="application/opds+json",
+            templated=True
+        )
     ]
-    
+
     catalog = Catalog(metadata=metadata, links=links)
-    
+
     assert len(catalog.links) == 2
     search_link = [link for link in catalog.links if link.rel == "search"][0]
     assert search_link.templated is True

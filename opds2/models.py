@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 from urllib.parse import urlencode
 
-from pydantic import BaseModel, Field # field_validator
+from pydantic import BaseModel, Field  # field_validator
 
 
 if TYPE_CHECKING:
@@ -16,15 +16,25 @@ if TYPE_CHECKING:
 
 class Link(BaseModel):
     """Represents a link in OPDS 2.0.
-    
+
     Links are used to associate resources with a publication or catalog.
     """
-    href: str = Field(..., description="URI or URI template of the linked resource")
-    type: Optional[str] = Field(None, description="MIME type of the linked resource")
-    rel: Optional[str] = Field(None, description="Relation between resource and parent")
+    href: str = Field(
+        ..., description="URI or URI template of the linked resource"
+    )
+    type: Optional[str] = Field(
+        None, description="MIME type of the linked resource"
+    )
+    rel: Optional[str] = Field(
+        None, description="Relation between resource and parent"
+    )
     title: Optional[str] = Field(None, description="Title of the link")
-    templated: Optional[bool] = Field(None, description="Indicates the href is a URI template")
-    properties: Optional[Dict[str, Any]] = Field(None, description="Additional properties")
+    templated: Optional[bool] = Field(
+        None, description="Indicates the href is a URI template"
+    )
+    properties: Optional[Dict[str, Any]] = Field(
+        None, description="Additional properties"
+    )
 
     model_config = {"extra": "allow"}
 
@@ -32,45 +42,76 @@ class Link(BaseModel):
 class Contributor(BaseModel):
     """Represents a contributor (author, illustrator, etc.)."""
     name: str = Field(..., description="Name of the contributor")
-    identifier: Optional[str] = Field(None, description="Unique identifier for the contributor")
-    sort_as: Optional[str] = Field(None, alias="sortAs", description="String to use for sorting")
+    identifier: Optional[str] = Field(
+        None, description="Unique identifier for the contributor"
+    )
+    sort_as: Optional[str] = Field(
+        None, alias="sortAs", description="String to use for sorting"
+    )
     role: Optional[str] = Field(None, description="Role of the contributor")
-    links: Optional[List[Link]] = Field(None, description="Links associated with the contributor")
+    links: Optional[List[Link]] = Field(
+        None, description="Links associated with the contributor"
+    )
 
     model_config = {"populate_by_name": True, "extra": "allow"}
 
 
 class Metadata(BaseModel):
     """Metadata for a publication or catalog.
-    
+
     Contains descriptive information about the resource.
     """
     title: str = Field(..., description="Title of the resource")
-    identifier: Optional[str] = Field(None, alias="@id", description="Unique identifier")
-    type: Optional[str] = Field(None, alias="@type", description="Type of the resource")
-    modified: Optional[datetime] = Field(None, description="Last modification date")
-    published: Optional[datetime] = Field(None, description="Publication date")
-    language: Optional[List[str]] = Field(None, description="Language codes")
-    description: Optional[str] = Field(None, description="Description of the resource")
+    identifier: Optional[str] = Field(
+        None, alias="@id", description="Unique identifier"
+    )
+    type: Optional[str] = Field(
+        None, alias="@type", description="Type of the resource"
+    )
+    modified: Optional[datetime] = Field(
+        None, description="Last modification date"
+    )
+    published: Optional[datetime] = Field(
+        None, description="Publication date"
+    )
+    language: Optional[List[str]] = Field(
+        None, description="Language codes"
+    )
+    description: Optional[str] = Field(
+        None, description="Description of the resource"
+    )
     author: Optional[List[Contributor]] = Field(None, description="Authors")
-    illustrator: Optional[List[Contributor]] = Field(None, description="Illustrators")
-    translator: Optional[List[Contributor]] = Field(None, description="Translators")
+    illustrator: Optional[List[Contributor]] = Field(
+        None, description="Illustrators"
+    )
+    translator: Optional[List[Contributor]] = Field(
+        None, description="Translators"
+    )
     editor: Optional[List[Contributor]] = Field(None, description="Editors")
-    publisher: Optional[List[Contributor]] = Field(None, description="Publishers")
+    publisher: Optional[List[Contributor]] = Field(
+        None, description="Publishers"
+    )
     subject: Optional[List[str]] = Field(None, description="Subject tags")
-    numberOfItems: Optional[int] = Field(None, description="Number of items in collection")
+    numberOfItems: Optional[int] = Field(
+        None, description="Number of items in collection"
+    )
 
     model_config = {"populate_by_name": True, "extra": "allow"}
 
 
 class Publication(BaseModel):
     """Represents a publication in OPDS 2.0.
-    
-    A publication is a digital work (book, audiobook, etc.) with metadata and links.
+
+    A publication is a digital work (book, audiobook, etc.)
+    with metadata and links.
     """
     metadata: Metadata = Field(..., description="Metadata about the publication")
-    links: List[Link] = Field(default_factory=list, description="Links to resources")
-    images: Optional[List[Link]] = Field(None, description="Cover images and thumbnails")
+    links: List[Link] = Field(
+        default_factory=list, description="Links to resources"
+    )
+    images: Optional[List[Link]] = Field(
+        None, description="Cover images and thumbnails"
+    )
 
     model_config = {"extra": "allow"}
 
@@ -93,13 +134,15 @@ class Navigation(BaseModel):
 
 class Catalog(BaseModel):
     """Represents an OPDS 2.0 catalog/feed.
-    
+
     A catalog is a collection of publications with optional navigation.
     """
     metadata: Metadata = Field(..., description="Metadata about the catalog")
-    links: List[Link] = Field(default_factory=list, description="Links (self, search, etc.)")
+    links: List[Link] = Field(
+        default_factory=list, description="Links (self, search, etc.)"
+    )
     publications: Optional[List[Publication]] = Field(
-        None, 
+        None,
         description="List of publications in this catalog"
     )
     navigation: Optional[List[Navigation]] = Field(
@@ -117,7 +160,7 @@ class Catalog(BaseModel):
 
     model_config = {"extra": "allow"}
 
-    #@field_validator("links", mode="before")
+    # @field_validator("links", mode="before")
     @classmethod
     def ensure_self_link(cls, v: List[Link]) -> List[Link]:
         """Ensure there's at least a structure for links."""
@@ -163,10 +206,11 @@ class Catalog(BaseModel):
         Search for publications and return an OPDS Catalog.
 
         Args:
-            search: SearchResponse from DataProvider to convert to publication/etc.
+            search: SearchResponse from DataProvider to convert to
+                    publication/etc.
         """
 
-        metadata = metadata or Metadata()
+        metadata = metadata or Metadata(title="Search Results")
         links = links or []
 
         if search:
@@ -213,7 +257,9 @@ class Catalog(BaseModel):
                 links.append(
                     Link(
                         rel="previous",
-                        href=base_url + "?" + urlencode(params | {"page": str(search.page - 1)}),
+                        href=base_url + "?" + urlencode(
+                            params | {"page": str(search.page - 1)}
+                        ),
                         type="application/opds+json",
                     )
                 )
@@ -222,14 +268,18 @@ class Catalog(BaseModel):
                 links.append(
                     Link(
                         rel="next",
-                        href=base_url + "?" + urlencode(params | {"page": str(search.page + 1)}),
+                        href=base_url + "?" + urlencode(
+                            params | {"page": str(search.page + 1)}
+                        ),
                         type="application/opds+json",
                     )
                 )
                 links.append(
                     Link(
                         rel="last",
-                        href=base_url + "?" + urlencode(params | {"page": str(search.last_page)}),
+                        href=base_url + "?" + urlencode(
+                            params | {"page": str(search.last_page)}
+                        ),
                         type="application/opds+json",
                     )
                 )
