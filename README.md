@@ -42,10 +42,18 @@ class MyProvider(DataProvider):
     def search(query, limit=50, offset=0, sort=None):
         records = [MyRecord()]
         # Return a list of MyRecord instances and total count
-        return SearchResponse(records, len(records), query, limit, offset, sort)
+        return MyProvider.SearchResponse(
+            MyProvider,
+            records=records,
+            total=len(records),
+            query=query,
+            limit=limit,
+            offset=offset,
+            sort=sort
+        )
 
 catalog = Catalog.create(MyProvider.search("example"))
-print(catalog.model_dump_json(indent=2))
+catalog.model_dump_json()
 ```
 
 See `examples/openlibrary.py` for a real-world integration with OpenLibrary.
