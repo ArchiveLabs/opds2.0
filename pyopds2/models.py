@@ -213,7 +213,8 @@ class Catalog(BaseModel):
             response: Optional SearchResponse for paginated search results
             paginate: Whether to add pagination links (requires data)
         """
-        metadata = metadata or Metadata(title="OPDS Catalog")
+        if not metadata:
+            metadata = Metadata(title=response.title or "OPDS Catalog")
         links = links or []
         publications = publications or []
 

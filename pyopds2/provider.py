@@ -76,6 +76,7 @@ class DataProvider(ABC):
         sort: Optional[str]
         records: List[DataProviderRecord]
         total: int
+        title: Optional[str] = None
 
         def get_search_url(self, **kwargs: str) -> str:
             base_url = self.provider.SEARCH_URL.replace("{?query}", "")
@@ -118,6 +119,7 @@ class DataProvider(ABC):
         limit: int = 50,
         offset: int = 0,
         sort: Optional[str] = None,
+        title: Optional[str] = None,
     ) -> 'DataProvider.SearchResponse':
         """Search for publications matching the query.
 
@@ -126,6 +128,7 @@ class DataProvider(ABC):
             limit: Maximum number of results to return (default: 50)
             offset: Offset for pagination (default: 0)
             sort: Optional sorting parameter
+            title: Title to pass along to Catalog.create
 
         Returns:
             SearchResponse object containing search results
@@ -137,5 +140,6 @@ class DataProvider(ABC):
             query=query,
             limit=limit,
             offset=offset,
-            sort=sort
+            sort=sort,
+            title=title,
         )
