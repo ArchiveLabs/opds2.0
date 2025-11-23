@@ -4,7 +4,7 @@ Based on the OPDS 2.0 specification and Web Publication Manifest.
 """
 
 from datetime import datetime
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field  # field_validator
