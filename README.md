@@ -56,8 +56,10 @@ catalog = Catalog.create(MyProvider.search("example"))
 catalog.model_dump_json()
 ```
 
-See `examples/openlibrary.py` for a real-world integration with OpenLibrary.
+### Reference Adapters
 
+- The **Open Library** pyopds2 adapter: https://github.com/ArchiveLabs/pyopds2_openlibrary
+- The **Lenny** pyopds2 adapter: https://github.com/ArchiveLabs/pyopds2_lenny
 
 ### API Reference
 
