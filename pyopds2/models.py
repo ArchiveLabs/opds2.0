@@ -4,6 +4,7 @@ Based on the OPDS 2.0 specification and Web Publication Manifest.
 """
 
 from datetime import datetime
+from dataclasses import dataclass, asdict
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field  # field_validator
@@ -242,3 +243,14 @@ class Catalog(BaseModel):
                 catalog.add_pagination(response)
 
         return catalog
+
+@dataclass
+class Search:
+    query: str
+    limit: int
+    offset: Optional[int] = None
+    sort: Optional[str] = None
+
+    def __iter__(self):
+        """Allows **Search(...) to unpack into a dict for DataProvider.search(**s)"""
+        return iter(asdict(self).items())
