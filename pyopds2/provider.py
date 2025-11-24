@@ -54,7 +54,10 @@ class Search(BaseModel, Mapping):
         return iter(self.model_dump())
 
     def __getitem__(self, item):
-        return getattr(self, item)
+        try:
+            return getattr(self, item)
+        except AttributeError:
+            raise KeyError(item)
 
     def __len__(self):
         return len(self.model_fields)
@@ -77,6 +80,11 @@ class SearchResponse(BaseModel):
         return self.search.params
 
     @property
+    def limit(self) -> int:
+        """Return limit from search."""
+        return self.search.limit
+
+    @property
     def page(self) -> int:
         """Calculate current page number based on offset and limit."""
         if self.search.limit <= 0: return 1
@@ -92,6 +100,34 @@ class SearchResponse(BaseModel):
     def has_more(self) -> bool:
         """Determine if there are more results beyond the current page."""
         return (self.search.offset + self.search.limit) < self.total
+
+    @property
+    def title(self) -> str:
+        """Return provider title."""
+        return self.provider.TITLE
+
+    def get_search_url(self, page: Optional[int] = None) -> str:
+        """Build search URL with parameters.
+        
+        Args:
+            page: Optional page number to override current page
+        """
+        params = self.params.copy()
+        
+        if page is not None:
+            # Calculate offset for the requested page
+            params['offset'] = str((page - 1) * self.search.limit)
+        
+        # Extract base URL without template parameters
+        # SEARCH_URL format: "/opds/search{?query}" -> "/opds/search"
+        search_path = self.provider.SEARCH_URL
+        if '{' in search_path:
+            search_path = search_path[:search_path.index('{')]
+        
+        return build_url(
+            f"{self.provider.BASE_URL}{search_path}",
+            params
+        )
 
 
 class DataProvider(ABC):

@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from typing import List, Optional
 
 from pyopds2 import Catalog, Contributor, Link, Metadata, Publication
-from pyopds2.provider import DataProvider, DataProviderRecord
+from pyopds2.provider import DataProvider, DataProviderRecord, Search, SearchResponse
 
 
 class SimpleBook(DataProviderRecord):
@@ -67,7 +67,7 @@ class TestIntegration:
                 limit: int = 50,
                 offset: int = 0,
                 sort: Optional[str] = None
-            ) -> DataProvider.SearchResponse:
+            ) -> SearchResponse:
                 """Search for books."""
                 results = []
                 for book in SimpleProvider.BOOKS:
@@ -78,12 +78,9 @@ class TestIntegration:
                 paginated = results[offset:offset + limit]
                 records = [SimpleBook(**book) for book in paginated]
 
-                return DataProvider.SearchResponse(
+                return SearchResponse(
                     provider=SimpleProvider,
-                    query=query,
-                    limit=limit,
-                    offset=offset,
-                    sort=sort,
+                    search=Search(query=query, limit=limit, offset=offset, sort=sort),
                     records=records,
                     total=total
                 )
