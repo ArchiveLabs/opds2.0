@@ -54,7 +54,10 @@ class Search(BaseModel, Mapping):
         return iter(self.model_dump())
 
     def __getitem__(self, item):
-        return getattr(self, item)
+        try:
+            return getattr(self, item)
+        except AttributeError:
+            raise KeyError(item)
 
     def __len__(self):
         return len(self.model_fields)
@@ -115,8 +118,14 @@ class SearchResponse(BaseModel):
             # Calculate offset for the requested page
             params['offset'] = str((page - 1) * self.search.limit)
         
+        # Extract base URL without template parameters
+        # SEARCH_URL format: "/opds/search{?query}" -> "/opds/search"
+        search_path = self.provider.SEARCH_URL
+        if '{' in search_path:
+            search_path = search_path[:search_path.index('{')]
+        
         return build_url(
-            f"{self.provider.BASE_URL}{self.provider.SEARCH_URL.split('{')[0]}",
+            f"{self.provider.BASE_URL}{search_path}",
             params
         )
 
