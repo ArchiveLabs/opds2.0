@@ -3,7 +3,9 @@
 Data providers implement the logic for searching and retrieving publications.
 """
 
+
 from abc import ABC, abstractmethod
+from collections.abc import Mapping
 from dataclasses import dataclass
 import functools
 from typing import List, Optional
@@ -42,6 +44,28 @@ class DataProviderRecord(BaseModel, ABC):
             links=self.links(),
             images=self.images()
         )
+
+
+class Search(BaseModel, Mapping):
+    query: str
+    limit: int = 50
+    offset: int = 0
+    sort: Optional[str] = None
+
+    def __iter__(self):
+        """Allows **Search(...) to unpack into a dict for DataProvider.search(**s)"""
+        return iter(self.model_dump())
+
+    def __getitem__(self, item):
+        return getattr(self, item)
+
+    def __len__(self):
+        return len(self.model_fields)
+    
+    @property
+    def params(self) -> dict[str, str]:
+        d = self.model_dump(exclude_none=True)
+        return {k: str(v) for k, v in d.items()}
 
 
 class DataProvider(ABC):
@@ -112,9 +136,9 @@ class DataProvider(ABC):
             """Determine if there are more results beyond the current page."""
             return (self.offset + self.limit) < self.total
 
-    @staticmethod
-    @abstractmethod
+    @classmethod
     def search(
+        cls,
         query: str,
         limit: int = 50,
         offset: int = 0,
@@ -133,8 +157,8 @@ class DataProvider(ABC):
         Returns:
             SearchResponse object containing search results
         """
-        return DataProvider.SearchResponse(
-            DataProvider,
+        return cls.SearchResponse(
+            cls,
             records=[],
             total=0,
             query=query,
