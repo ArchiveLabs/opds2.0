@@ -6,7 +6,7 @@ from typing import List, Optional
 
 from pyopds2 import Catalog
 from pyopds2.models import Contributor, Link, Metadata, Publication
-from pyopds2.provider import DataProvider, DataProviderRecord
+from pyopds2.provider import DataProvider, DataProviderRecord, Search, SearchResponse
 
 
 class MockBook(DataProviderRecord):
@@ -73,7 +73,7 @@ class MockDataProvider(DataProvider):
         limit: int = 50,
         offset: int = 0,
         sort: Optional[str] = None
-    ) -> DataProvider.SearchResponse:
+    ) -> SearchResponse:
         """Search mock books."""
         # Simple case-insensitive search
         query_lower = query.lower()
@@ -91,12 +91,9 @@ class MockDataProvider(DataProvider):
         # Convert to MockBook records
         records = [MockBook(**book) for book in paginated_results]
 
-        return DataProvider.SearchResponse(
+        return SearchResponse(
             provider=MockDataProvider,
-            query=query,
-            limit=limit,
-            offset=offset,
-            sort=sort,
+            search=Search(query=query, limit=limit, offset=offset, sort=sort),
             records=records,
             total=total
         )

@@ -4,14 +4,13 @@ Based on the OPDS 2.0 specification and Web Publication Manifest.
 """
 
 from datetime import datetime
-from dataclasses import dataclass, asdict
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field  # field_validator
 
 
 if TYPE_CHECKING:
-    from pyopds2.provider import DataProvider
+    from pyopds2.provider import SearchResponse
 
 
 class Link(BaseModel):
@@ -59,6 +58,8 @@ class Metadata(BaseModel):
     publisher: Optional[List[Contributor]] = Field(None, description="Publishers")
     subject: Optional[List[str]] = Field(None, description="Subject tags")
     numberOfItems: Optional[int] = Field(None, description="Number of items in collection")
+    itemsPerPage: Optional[int] = Field(None, description="Items per page for pagination")
+    currentPage: Optional[int] = Field(None, description="Current page number")
 
     model_config = {"populate_by_name": True, "extra": "allow"}
 
@@ -145,7 +146,7 @@ class Catalog(BaseModel):
         data = self.model_dump(**kwargs)
         return json.dumps(data, default=str)
 
-    def add_pagination(self, response: 'DataProvider.SearchResponse'):
+    def add_pagination(self, response: 'SearchResponse'):
         """
         Add pagination to the current Catalog based on the SearchResponse.
         """
@@ -197,7 +198,7 @@ class Catalog(BaseModel):
     @classmethod
     def create(
         cls,
-        response: Optional['DataProvider.SearchResponse'] = None,
+        response: Optional['SearchResponse'] = None,
         paginate: bool = True,
         # Catalog properties
         metadata: Optional[Metadata] = None,
@@ -244,13 +245,4 @@ class Catalog(BaseModel):
 
         return catalog
 
-@dataclass
-class Search:
-    query: str
-    limit: int
-    offset: Optional[int] = None
-    sort: Optional[str] = None
 
-    def __iter__(self):
-        """Allows **Search(...) to unpack into a dict for DataProvider.search(**s)"""
-        return iter(asdict(self).items())

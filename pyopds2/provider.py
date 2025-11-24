@@ -77,6 +77,11 @@ class SearchResponse(BaseModel):
         return self.search.params
 
     @property
+    def limit(self) -> int:
+        """Return limit from search."""
+        return self.search.limit
+
+    @property
     def page(self) -> int:
         """Calculate current page number based on offset and limit."""
         if self.search.limit <= 0: return 1
@@ -92,6 +97,28 @@ class SearchResponse(BaseModel):
     def has_more(self) -> bool:
         """Determine if there are more results beyond the current page."""
         return (self.search.offset + self.search.limit) < self.total
+
+    @property
+    def title(self) -> str:
+        """Return provider title."""
+        return self.provider.TITLE
+
+    def get_search_url(self, page: Optional[int] = None) -> str:
+        """Build search URL with parameters.
+        
+        Args:
+            page: Optional page number to override current page
+        """
+        params = self.params.copy()
+        
+        if page is not None:
+            # Calculate offset for the requested page
+            params['offset'] = str((page - 1) * self.search.limit)
+        
+        return build_url(
+            f"{self.provider.BASE_URL}{self.provider.SEARCH_URL.split('{')[0]}",
+            params
+        )
 
 
 class DataProvider(ABC):
