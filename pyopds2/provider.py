@@ -4,8 +4,7 @@ Data providers implement the logic for searching and retrieving publications.
 """
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
-import functools
+from collections.abc import Mapping
 from typing import List, Optional
 from pydantic import BaseModel
 
@@ -44,83 +43,76 @@ class DataProviderRecord(BaseModel, ABC):
         )
 
 
+class Search(BaseModel, Mapping):
+    query: str
+    limit: int = 50
+    offset: int = 0
+    sort: Optional[str] = None
+
+    def __iter__(self):
+        """Allows **Search(...) to unpack into a dict for DataProvider.search(**s)"""
+        return iter(self.model_dump())
+
+    def __getitem__(self, item):
+        return getattr(self, item)
+
+    def __len__(self):
+        return len(self.model_fields)
+    
+    @property
+    def params(self) -> dict[str, str]:
+        d = self.model_dump(exclude_none=True)
+        return {k: str(v) for k, v in d.items()}
+
+
+class SearchResponse(BaseModel):
+    """Response from a search query."""
+    provider: type["DataProvider"]
+    search: Search
+    records: List[DataProviderRecord]
+    total: int
+
+    @property
+    def params(self) -> dict[str, str]:
+        return self.search.params
+
+    @property
+    def page(self) -> int:
+        """Calculate current page number based on offset and limit."""
+        if self.search.limit <= 0: return 1
+        return (self.search.offset // self.search.limit) + 1
+
+    @property
+    def last_page(self) -> int:
+        """Calculate last page number based on total and limit."""
+        if self.search.limit <= 0 or self.total == 0: return 1
+        return (self.total + self.search.limit - 1) // self.search.limit
+
+    @property
+    def has_more(self) -> bool:
+        """Determine if there are more results beyond the current page."""
+        return (self.search.offset + self.search.limit) < self.total
+
+
 class DataProvider(ABC):
     """Abstract base class for OPDS 2.0 data providers.
 
     Consumers of this library should extend this class to provide
     their own implementation for searching and retrieving publications.
-
-    Example:
-        class MyDataProvider(DataProvider):
-            def search(self, query: str, limit: int = 50, offset: int = 0) -> List[Publication]:
-                # Implement search logic
-                results = my_search_function(query, limit, offset)
-                return [self._to_publication(item) for item in results]
     """
 
     TITLE: str = "Generic OPDS Service"
-
     BASE_URL: str = "http://localhost"
-    """The base url for the data provider."""
-
     SEARCH_URL: str = "/opds/search{?query}"
-    """The relative url template for search queries."""
 
-    @dataclass
-    class SearchResponse:
-        """Response from a search query."""
-        provider: 'DataProvider | type[DataProvider]'
-        query: str
-        limit: int
-        offset: int
-        sort: Optional[str]
-        records: List[DataProviderRecord]
-        total: int
-        title: Optional[str] = None
-
-        def get_search_url(self, **kwargs: str) -> str:
-            base_url = self.provider.SEARCH_URL.replace("{?query}", "")
-            if base_url.startswith("/"):
-                base_url = self.provider.BASE_URL.rstrip('/') + base_url
-            return build_url(base_url, params=self.params | kwargs)
-
-        @functools.cached_property
-        def params(self) -> dict:
-            p: dict[str, str] = {}
-            if self.query:
-                p["query"] = self.query
-            if self.limit:
-                p["limit"] = str(self.limit)
-            if self.page > 1:
-                p["page"] = str(self.page)
-            if self.sort:
-                p["sort"] = self.sort
-            return p
-
-        @property
-        def page(self) -> int:
-            """Calculate current page number based on offset and limit."""
-            return (self.offset // self.limit) + 1 if self.limit else 1
-
-        @property
-        def last_page(self) -> int:
-            """Calculate last page number based on total and limit."""
-            return (self.total + self.limit - 1) // self.limit
-
-        @property
-        def has_more(self) -> bool:
-            """Determine if there are more results beyond the current page."""
-            return (self.offset + self.limit) < self.total
-
-    @staticmethod
-    @abstractmethod
+    @classmethod
     def search(
+        cls,
         query: str,
         limit: int = 50,
         offset: int = 0,
         sort: Optional[str] = None,
-        title: Optional[str] = None,
-    ) -> 'DataProvider.SearchResponse':
+    ) -> SearchResponse:
         """Search for publications matching the query.
 
         Args:
@@ -128,18 +120,13 @@ class DataProvider(ABC):
             limit: Maximum number of results to return (default: 50)
             offset: Offset for pagination (default: 0)
             sort: Optional sorting parameter
-            title: Title to pass along to Catalog.create
 
         Returns:
             SearchResponse object containing search results
         """
-        return DataProvider.SearchResponse(
-            DataProvider,
+        return SearchResponse(
+            provider=cls,
+            search=Search(query=query, limit=limit, offset=offset, sort=sort),
             records=[],
             total=0,
-            query=query,
-            limit=limit,
-            offset=offset,
-            sort=sort,
-            title=title,
         )
